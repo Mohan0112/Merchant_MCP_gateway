@@ -44,6 +44,10 @@ platform:
     resources:
       requests: { cpu: 100m, memory: 192Mi }
       limits: { cpu: 1000m, memory: 768Mi }
+  dashboard:
+    image:
+      repository: ghcr.io/mohan0112/merchant_mcp_gateway/dashboard
+      tag: CHANGE-ME-git-sha
   postgres:
     resources:
       requests: { cpu: 100m, memory: 256Mi }

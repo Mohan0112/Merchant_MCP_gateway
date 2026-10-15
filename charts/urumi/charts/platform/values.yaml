@@ -15,6 +15,16 @@ gateway:
     requests: { cpu: 100m, memory: 160Mi }
     limits: { cpu: 750m, memory: 512Mi }
 
+dashboard:
+  image:
+    repository: urumi-registry:5000/urumi-dashboard
+    tag: dev
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests: { cpu: 10m, memory: 16Mi }
+    limits: { cpu: 200m, memory: 64Mi }
+
 postgres:
   image:
     repository: postgres

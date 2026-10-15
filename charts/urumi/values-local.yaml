@@ -27,3 +27,8 @@ platform:
       repository: urumi-registry:5000/urumi-gateway
       tag: dev
       pullPolicy: Always
+  dashboard:
+    image:
+      repository: urumi-registry:5000/urumi-dashboard
+      tag: dev
+      pullPolicy: Always

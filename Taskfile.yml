@@ -66,6 +66,7 @@ tasks:
         vars: { APP: fx-mcp }
       - task: image:node
         vars: { APP: gateway }
+      - task: image:dashboard
 
   image:node:
     desc: Build and push one Node service image (task image:node APP=fx-mcp)
@@ -74,6 +75,12 @@ tasks:
     cmds:
       - docker build -f docker/node-app/Dockerfile --build-arg APP={{.APP}} -t {{.REGISTRY}}/urumi-{{.APP}}:{{.TAG}} .
       - docker push {{.REGISTRY}}/urumi-{{.APP}}:{{.TAG}}
+
+  image:dashboard:
+    desc: Build and push the dashboard image (static React build served by nginx)
+    cmds:
+      - docker build -f docker/dashboard/Dockerfile -t {{.REGISTRY}}/urumi-dashboard:{{.TAG}} .
+      - docker push {{.REGISTRY}}/urumi-dashboard:{{.TAG}}
 
   image:wordpress:
     desc: Build and push the WordPress + WooCommerce store image

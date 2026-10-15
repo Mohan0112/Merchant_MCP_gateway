@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  labels:
+    {{- include "platform.labels" (list . "dashboard") | nindent 4 }}
+spec:
+  selector:
+    {{- include "platform.selectorLabels" (list . "dashboard") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Static files only (nginx). The browser talks to the gateway on the same host via the Ingress.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  labels:
+    {{- include "platform.labels" (list . "dashboard") | nindent 4 }}
+spec:
+  replicas: {{ .Values.dashboard.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (list . "dashboard") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.labels" (list . "dashboard") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: dashboard
+          image: "{{ .Values.dashboard.image.repository }}:{{ .Values.dashboard.image.tag }}"
+          imagePullPolicy: {{ .Values.dashboard.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+          securityContext:
+            {{- include "platform.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            # nginx writes its pid and temp files here; the rest of the filesystem is read-only.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 32Mi }

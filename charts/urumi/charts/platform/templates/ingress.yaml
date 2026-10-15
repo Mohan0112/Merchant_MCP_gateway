@@ -1,4 +1,4 @@
-# app.<domain>: /api and /mcp go to the gateway (the dashboard takes "/" from Task 13).
+# app.<domain>: /api and /mcp go to the gateway, everything else to the dashboard (longest prefix wins).
 # Health endpoints (/livez, /readyz) are deliberately not routed, so they stay internal.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -29,3 +29,7 @@ spec:
             pathType: Prefix
             backend:
               service: { name: gateway, port: { name: http } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: dashboard, port: { name: http } }

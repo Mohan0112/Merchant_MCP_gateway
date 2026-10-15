@@ -1,0 +1,31 @@
+# app.<domain>: /api and /mcp go to the gateway (the dashboard takes "/" from Task 13).
+# Health endpoints (/livez, /readyz) are deliberately not routed, so they stay internal.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+  {{- with .Values.global.tls.clusterIssuer }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ . }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.global.ingressClassName }}
+  {{- if .Values.global.tls.enabled }}
+  tls:
+    - hosts: [{{ include "platform.host" . }}]
+      secretName: app-tls
+  {{- end }}
+  rules:
+    - host: {{ include "platform.host" . }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: gateway, port: { name: http } }
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service: { name: gateway, port: { name: http } }

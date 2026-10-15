@@ -1,0 +1,26 @@
+{
+  "name": "gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Team MCP gateway: REST API for the dashboard, aggregating MCP endpoint, chat module",
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@urumi/contracts": "workspace:*",
+    "@urumi/logger": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "fastify": "^5.12.7",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11"
+  }
+}

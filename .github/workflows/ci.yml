@@ -19,6 +19,17 @@ jobs:
   checks:
     name: lint, typecheck, test, build
     runs-on: ubuntu-latest
+    services:
+      # Real PostgreSQL for the gateway's database tests (they skip when TEST_DATABASE_URL is unset).
+      postgres:
+        image: postgres:17.11-alpine
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

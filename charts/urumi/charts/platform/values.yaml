@@ -1,0 +1,33 @@
+gateway:
+  image:
+    repository: urumi-registry:5000/urumi-gateway
+    tag: dev
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 160Mi }
+    limits: { cpu: 750m, memory: 512Mi }
+
+postgres:
+  image:
+    repository: postgres
+    tag: 17.11-alpine
+  database: urumi
+  user: urumi
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  persistence:
+    size: 1Gi
+    storageClass: ''
+
+# Secrets are created outside the chart by scripts/secrets.mjs (ADR-008); only names live here.
+secrets:
+  # keys: password
+  db: platform-db
+  # keys: api-key-pepper, credential-key
+  crypto: gateway-crypto
+  # keys: email, password
+  bootstrapAdmin: gateway-bootstrap-admin
+  # keys: groq-api-key, gemini-api-key
+  llm: llm

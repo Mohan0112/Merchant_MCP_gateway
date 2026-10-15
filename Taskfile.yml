@@ -64,6 +64,8 @@ tasks:
         vars: { APP: woo-mcp }
       - task: image:node
         vars: { APP: fx-mcp }
+      - task: image:node
+        vars: { APP: gateway }
 
   image:node:
     desc: Build and push one Node service image (task image:node APP=fx-mcp)

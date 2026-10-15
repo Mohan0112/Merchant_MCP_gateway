@@ -52,6 +52,7 @@
     },
     "woo-mcp": { "$ref": "#/definitions/mcpServer" },
     "fx-mcp": { "$ref": "#/definitions/mcpServer" },
+    "platform": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
     "store": {
       "type": "object",
       "properties": {

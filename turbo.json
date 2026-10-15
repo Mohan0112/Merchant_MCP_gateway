@@ -8,7 +8,8 @@
     "typecheck": {},
     "lint": {},
     "test": {
-      "outputs": []
+      "outputs": [],
+      "env": ["TEST_DATABASE_URL"]
     }
   }
 }

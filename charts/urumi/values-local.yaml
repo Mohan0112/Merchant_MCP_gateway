@@ -20,3 +20,10 @@ woo-mcp:
 fx-mcp:
   image:
     pullPolicy: Always
+
+platform:
+  gateway:
+    image:
+      repository: urumi-registry:5000/urumi-gateway
+      tag: dev
+      pullPolicy: Always

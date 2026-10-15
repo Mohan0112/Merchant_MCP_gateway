@@ -1,0 +1,6 @@
+apiVersion: v2
+name: platform
+description: Team MCP gateway (REST API, aggregating MCP endpoint, chat module), its PostgreSQL, and the dashboard
+type: application
+version: 0.1.0
+appVersion: '0.1.0'

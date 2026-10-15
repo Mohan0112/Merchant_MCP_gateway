@@ -35,3 +35,18 @@ fx-mcp:
   image:
     repository: ghcr.io/mohan0112/merchant_mcp_gateway/fx-mcp
     tag: CHANGE-ME-git-sha
+
+platform:
+  gateway:
+    image:
+      repository: ghcr.io/mohan0112/merchant_mcp_gateway/gateway
+      tag: CHANGE-ME-git-sha
+    resources:
+      requests: { cpu: 100m, memory: 192Mi }
+      limits: { cpu: 1000m, memory: 768Mi }
+  postgres:
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: 1000m, memory: 1Gi }
+    persistence:
+      size: 5Gi

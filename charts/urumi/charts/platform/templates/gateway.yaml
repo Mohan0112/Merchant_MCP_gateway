@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+spec:
+  selector:
+    {{- include "platform.selectorLabels" (list . "gateway") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (list . "gateway") | nindent 6 }}
+  template:
+    metadata:
+      # The label app.kubernetes.io/name=gateway is what the MCP servers' NetworkPolicies admit.
+      labels:
+        {{- include "platform.labels" (list . "gateway") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # Apply pending database migrations before the server starts (already-applied ones are skipped).
+        - name: migrate
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          args: [migrate.mjs]
+          env:
+            {{- include "platform.databaseEnv" . | nindent 12 }}
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            {{- include "platform.containerSecurityContext" . | nindent 12 }}
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          args: [server.mjs]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            {{- include "platform.databaseEnv" . | nindent 12 }}
+            - name: PUBLIC_BASE_URL
+              value: "{{ .Values.global.scheme }}://{{ include "platform.host" . }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.global.logLevel | quote }}
+            - name: APP_VERSION
+              value: {{ .Chart.AppVersion | quote }}
+            - name: GIT_SHA
+              value: {{ .Values.gateway.image.tag | quote }}
+          startupProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          securityContext:
+            {{- include "platform.containerSecurityContext" . | nindent 12 }}

@@ -2,10 +2,10 @@ apiVersion: v2
 name: urumi
 description: WooCommerce store, MCP servers, team MCP gateway and dashboard in one release
 type: application
-version: 0.3.0
-appVersion: '0.3.0'
+version: 0.4.0
+appVersion: '0.4.0'
 # Local sub-charts live in charts/. The generic mcp-server chart is used once per MCP server
-# through an alias; the alias becomes the resource name. The platform sub-chart arrives in Task 9.
+# through an alias; the alias becomes the resource name.
 dependencies:
   - name: store
     version: 0.1.0
@@ -18,3 +18,6 @@ dependencies:
     alias: fx-mcp
     version: 0.1.0
     condition: fx-mcp.enabled
+  - name: platform
+    version: 0.1.0
+    condition: platform.enabled

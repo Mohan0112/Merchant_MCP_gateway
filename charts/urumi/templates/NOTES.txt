@@ -1,0 +1,5 @@
+Release {{ .Release.Name }} installed in namespace {{ .Release.Namespace }}.
+
+Storefront: http://{{ include "urumi.host" (list . "store") }}
+Dashboard:  http://{{ include "urumi.host" (list . "app") }}
+(Components appear here as later tasks add them.)

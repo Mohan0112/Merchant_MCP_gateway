@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["global"],
+  "properties": {
+    "global": {
+      "type": "object",
+      "required": ["domain", "ingressClassName"],
+      "properties": {
+        "domain": { "type": "string", "minLength": 3 },
+        "ingressClassName": { "type": "string" }
+      }
+    },
+    "traefik": {
+      "type": "object",
+      "properties": {
+        "configureTimeouts": { "type": "boolean" }
+      }
+    }
+  }
+}

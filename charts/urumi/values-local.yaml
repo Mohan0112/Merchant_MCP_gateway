@@ -1,0 +1,4 @@
+# Local k3d cluster. *.127.0.0.1.nip.io resolves to 127.0.0.1, so no hosts-file edits are needed
+# (see docs/local-domains.md).
+global:
+  domain: 127.0.0.1.nip.io

@@ -17,7 +17,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | Task | Title | Status | Notes |
 |---|---|---|---|
 | 1 | Repository and engineering baseline | ✅ | Monorepo, lint, typecheck, tests, CI workflow, gitleaks rule |
-| 2 | Local Kubernetes platform | ⏳ | |
+| 2 | Local Kubernetes platform | ✅ | k3d cluster, registry, Traefik timeouts, nip.io domains, NetworkPolicy proven |
 | 3 | Technical spikes | ⏳ | |
 | 4 | Store image and sub-chart | ⏳ | |
 | 5 | Store bootstrap and checkout | ⏳ | |
@@ -57,6 +57,9 @@ Verified on the owner's laptop (Windows 11, 16 GB RAM, 12 logical cores).
 | Docker Desktop | Engine 29.8.2 | WSL2 backend; 12 CPUs and about 7.6 GiB available to containers |
 | k3d / Helm / Task / gh | 5.9.0 / 4.3.1 / 3.54.0 / 2.102.0 | Installed with winget |
 | git | 2.45.2 | |
+| k3s (in k3d) | v1.35.5+k3s1 | Pinned in `deploy/k3d/cluster.yaml`; containerd 2.2.3 |
+| Traefik | 3.6.13 | Bundled with k3s |
+| local-path provisioner | v0.0.36 | Default StorageClass `local-path` |
 
 ---
 
@@ -67,6 +70,20 @@ Verified on the owner's laptop (Windows 11, 16 GB RAM, 12 logical cores).
 pnpm install            # restore dependencies from the lockfile
 task check              # lint, typecheck and test every package
 pnpm turbo run lint typecheck test --force   # same, ignoring Turborepo's cache
+
+task cluster:up         # create the k3d cluster + registry (no-op if it exists)
+task chart:lint         # helm lint + render with local and prod values
+task deploy:local       # helm upgrade --install urumi on the local cluster
+task cluster:reset      # delete and recreate the cluster (loses all cluster data)
+```
+
+Useful cluster checks:
+```sh
+kubectl config current-context                     # should be k3d-urumi
+kubectl get nodes                                  # 1 server + 1 agent, Ready
+kubectl -n kube-system get deploy traefik          # ingress controller
+docker exec k3d-urumi-server-0 cat /etc/rancher/k3s/registries.yaml   # registry mirror
+helm -n urumi history urumi                        # release revisions
 ```
 
 Common problems:
@@ -74,10 +91,53 @@ Common problems:
 - **"unmet peer typescript":** typescript-eslint needs TypeScript `<6.1`. Don't upgrade `typescript` to 7.x until typescript-eslint supports it.
 - **Tools not found right after installing them with winget:** open a new terminal. In VS Code, restart VS Code so new PATH entries are picked up.
 - **Slow installs:** the repo lives inside OneDrive. Pause OneDrive sync during big installs (risk R3).
+- **`http://*.127.0.0.1.nip.io` doesn't load:** check the cluster is running (`k3d cluster list`), that nothing else holds port 80 (`Get-NetTCPConnection -LocalPort 80 -State Listen`), and that nip.io resolves (`nslookup store.127.0.0.1.nip.io`). Offline fallback: see `docs/local-domains.md`.
+- **Pod stuck in `ImagePullBackOff` for a local image:** push to `localhost:5001/<name>:<tag>` and reference it as `urumi-registry:5000/<name>:<tag>` in the pod spec.
 
 ---
 
 ## Log
+
+### 2026-10-15 · Task 2: Local Kubernetes platform · ✅
+
+**What was done**
+- `deploy/k3d/cluster.yaml`:
+  - Cluster `urumi`: 1 server + 1 agent, k3s pinned to `v1.35.5-k3s1`.
+  - Host ports 80 and 443 mapped to the k3d load balancer.
+  - Local registry `urumi-registry` on host port 5001.
+  - Waits for nodes before returning.
+- Umbrella chart skeleton `charts/urumi`:
+  - `Chart.yaml`, `values.yaml`, `values-local.yaml`, `values-prod.yaml`, and `values.schema.json` (requires `global.domain` and `global.ingressClassName`).
+  - Helpers for standard labels and per-component hosts (`store.<domain>`, `app.<domain>`).
+  - `NOTES.txt`.
+  - `templates/traefik-config.yaml`: a k3s `HelmChartConfig` that sets Traefik's `readTimeout`/`writeTimeout` to 0 (no limit) and `idleTimeout` to 600 s on both entrypoints. Without it, Traefik v3 cuts SSE streams (`GET /mcp`, `/api/chat`) after 60 s.
+- Taskfile targets: `cluster:up` (no-op if the cluster exists), `cluster:down`, `cluster:reset`, `chart:lint`, `deploy:local`.
+- CI: a new `chart` job runs `helm lint` with both values files and renders both environments.
+- `docs/local-domains.md`: the nip.io approach, hosts-file fallback, port-conflict fallback, and how in-cluster traffic uses Service names.
+
+**Verification**
+- `task cluster:up` from nothing: cluster ready in **77 s**. Both nodes are `Ready` on Kubernetes v1.35.5+k3s1 (WSL2 kernel 6.18).
+- kube-system: coredns, local-path-provisioner v0.0.36 (default StorageClass), metrics-server and Traefik 3.6.13 all rolled out.
+- `task chart:lint`: both values files lint cleanly. `task deploy:local` installed release `urumi` (revision 1) in namespace `urumi`.
+- After the deploy, k3s re-ran `helm-install-traefik`. The Traefik pod's args now include `--entryPoints.web.transport.respondingTimeouts.readTimeout=0`, plus the matching `writeTimeout` and `idleTimeout` args, and the same three for `websecure`.
+- **Registry, ingress and DNS together:** pushed `traefik/whoami` as `localhost:5001/whoami:check`, deployed it as `urumi-registry:5000/whoami:check` with an Ingress for `hello.127.0.0.1.nip.io`. `curl http://hello.127.0.0.1.nip.io` returned the pod's hostname.
+- **NetworkPolicy enforcement** (k3s's built-in controller), with an `outsider` pod and an `insider` pod (`allowed=true`) calling the `hello` Service:
+
+  | Step | outsider | insider |
+  |---|---|---|
+  | No policy | 200 | — |
+  | Deny all ingress | blocked (curl exit 7) | blocked |
+  | Allow only `allowed=true` | blocked | 200 |
+
+- The throwaway check resources (namespace `k8s-check`) were deleted afterwards. Their manifests aren't committed.
+
+**Problems and fixes**
+1. k3d 5.9 names the registry container `urumi-registry`, not `k3d-urumi-registry` as older k3d versions do. Checked the node's `/etc/rancher/k3s/registries.yaml`: it mirrors both `urumi-registry:5000` and `urumi-registry:5001` to `http://urumi-registry:5000`. **Convention: push to `localhost:5001/…`, reference `urumi-registry:5000/…` in manifests.** The comment in `cluster.yaml` was corrected.
+2. PowerShell mangles `\n` inside kubectl JSONPath expressions; switched to splitting the output in PowerShell instead. This only affects interactive debugging.
+
+**Follow-ups**
+- `images:build` and `secrets` Taskfile targets arrive with the first image and Secrets (Task 4).
+- VPS provisioning was removed from this task (plan v1.2); see Task 31.
 
 ### 2026-10-15 · Task 1: Repository and engineering baseline · ✅
 

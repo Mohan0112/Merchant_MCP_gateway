@@ -29,6 +29,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run lint typecheck test build
 
+  chart:
+    name: helm lint and render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Lint with local and production values
+        run: |
+          helm lint charts/urumi -f charts/urumi/values-local.yaml
+          helm lint charts/urumi -f charts/urumi/values-prod.yaml
+      - name: Render both environments (proves only values differ)
+        run: |
+          helm template urumi charts/urumi -n urumi -f charts/urumi/values-local.yaml > /dev/null
+          helm template urumi charts/urumi -n urumi -f charts/urumi/values-prod.yaml > /dev/null
+
   secrets-scan:
     name: gitleaks
     runs-on: ubuntu-latest

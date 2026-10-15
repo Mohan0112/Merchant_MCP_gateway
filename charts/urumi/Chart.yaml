@@ -1,0 +1,7 @@
+apiVersion: v2
+name: urumi
+description: WooCommerce store, MCP servers, team MCP gateway and dashboard in one release
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+# Sub-charts (store, mcp-server, platform) are added under charts/ in Tasks 4, 6 and 9.

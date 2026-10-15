@@ -1,0 +1,31 @@
+# Local cluster for development: `task cluster:up`.
+# k3s is pinned so the local cluster and a future VPS (Task 31) run the same Kubernetes version.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: urumi
+servers: 1
+agents: 1
+image: rancher/k3s:v1.35.5-k3s1
+ports:
+  # Traefik (bundled with k3s) receives all HTTP(S) traffic through the k3d load balancer.
+  - port: 80:80
+    nodeFilters:
+      - loadbalancer
+  - port: 443:443
+    nodeFilters:
+      - loadbalancer
+registries:
+  # Local image registry. Push to localhost:5001/<image>; pods pull urumi-registry:5000/<image>
+  # (k3d writes the matching mirror into each node's /etc/rancher/k3s/registries.yaml).
+  create:
+    name: urumi-registry
+    host: 0.0.0.0
+    hostPort: '5001'
+options:
+  k3d:
+    wait: true
+    timeout: 180s
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

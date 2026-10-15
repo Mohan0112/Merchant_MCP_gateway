@@ -1,0 +1,3 @@
+# Production-like VPS running k3s (Task 31). Filled in during Task 19.
+global:
+  domain: CHANGE-ME.duckdns.org

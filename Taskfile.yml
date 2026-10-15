@@ -4,6 +4,9 @@ version: '3'
 
 vars:
   CLUSTER: urumi
+  NAMESPACE: urumi
+  RELEASE: urumi
+  CHART: charts/urumi
 
 tasks:
   install:
@@ -25,3 +28,45 @@ tasks:
     desc: Format the repository with Prettier
     cmds:
       - pnpm prettier --write .
+
+  # ---------- Local cluster ----------
+
+  cluster:up:
+    desc: Create the local k3d cluster and image registry (no-op if it exists)
+    status:
+      - k3d cluster get {{.CLUSTER}}
+    cmds:
+      - k3d cluster create --config deploy/k3d/cluster.yaml
+      - kubectl config use-context k3d-{{.CLUSTER}}
+      - kubectl wait --for=condition=Ready nodes --all --timeout=180s
+
+  cluster:down:
+    desc: Delete the local cluster and its registry (all cluster data is lost)
+    cmds:
+      - k3d cluster delete {{.CLUSTER}}
+
+  cluster:reset:
+    desc: Delete and recreate the local cluster
+    cmds:
+      - task: cluster:down
+      - task: cluster:up
+
+  # ---------- Helm ----------
+
+  chart:lint:
+    desc: Lint the chart and render it with local and production values
+    cmds:
+      - helm lint {{.CHART}} -f {{.CHART}}/values-local.yaml
+      - helm lint {{.CHART}} -f {{.CHART}}/values-prod.yaml
+      - helm template {{.RELEASE}} {{.CHART}} -n {{.NAMESPACE}} -f {{.CHART}}/values-local.yaml > /dev/null
+      - helm template {{.RELEASE}} {{.CHART}} -n {{.NAMESPACE}} -f {{.CHART}}/values-prod.yaml > /dev/null
+
+  deploy:local:
+    desc: Install or upgrade the release on the local cluster
+    cmds:
+      - kubectl config use-context k3d-{{.CLUSTER}}
+      - >-
+        helm upgrade --install {{.RELEASE}} {{.CHART}}
+        --namespace {{.NAMESPACE}} --create-namespace
+        -f {{.CHART}}/values-local.yaml
+        --wait --timeout 10m

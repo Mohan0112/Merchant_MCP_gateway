@@ -1,0 +1,26 @@
+{{- if .Values.traefik.configureTimeouts }}
+# k3s installs Traefik from its own HelmChart; a HelmChartConfig in kube-system overrides its values.
+# readTimeout/writeTimeout 0 = no limit, so SSE streams stay open; idle connections still close.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        transport:
+          respondingTimeouts:
+            readTimeout: 0
+            writeTimeout: 0
+            idleTimeout: 600s
+      websecure:
+        transport:
+          respondingTimeouts:
+            readTimeout: 0
+            writeTimeout: 0
+            idleTimeout: 600s
+{{- end }}

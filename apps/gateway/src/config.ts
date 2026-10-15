@@ -10,6 +10,11 @@ const ConfigSchema = z.object({
   PGDATABASE: z.string().min(1),
   /** Public URL of the dashboard and gateway, e.g. http://app.127.0.0.1.nip.io */
   PUBLIC_BASE_URL: z.url(),
+  /** Server-side secret mixed into API key hashes (Secret gateway-crypto). */
+  API_KEY_PEPPER: z.string().min(32),
+  /** First admin, created only when the users table is empty (Secret gateway-bootstrap-admin). */
+  BOOTSTRAP_ADMIN_EMAIL: z.string().trim().toLowerCase().pipe(z.email()),
+  BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12),
   APP_VERSION: z.string().default('0.1.0'),
   GIT_SHA: z.string().default('dev'),
 });

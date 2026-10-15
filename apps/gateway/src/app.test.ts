@@ -9,8 +9,8 @@ const logger = createLogger('test', {
   destination: new Writable({ write: (_c, _e, cb) => cb() }),
 });
 
-function app(dbUp = true) {
-  const instance = buildApp({
+async function app(dbUp = true) {
+  const instance = await buildApp({
     logger,
     checkDatabase: async () => {
       if (!dbUp) throw new Error('connection refused');
@@ -30,19 +30,23 @@ function app(dbUp = true) {
 
 describe('gateway app', () => {
   it('serves build info at /api/version', async () => {
-    const res = await app().inject({ method: 'GET', url: '/api/version' });
+    const res = await (await app()).inject({ method: 'GET', url: '/api/version' });
     expect(res.json()).toEqual({ name: 'gateway', version: '9.9.9', commit: 'abc123' });
   });
 
   it('is ready when the database answers and not ready when it does not', async () => {
-    expect((await app(true).inject({ method: 'GET', url: '/readyz' })).statusCode).toBe(200);
-    const down = await app(false).inject({ method: 'GET', url: '/readyz' });
+    expect((await (await app(true)).inject({ method: 'GET', url: '/readyz' })).statusCode).toBe(
+      200,
+    );
+    const down = await (await app(false)).inject({ method: 'GET', url: '/readyz' });
     expect(down.statusCode).toBe(503);
-    expect((await app(false).inject({ method: 'GET', url: '/livez' })).statusCode).toBe(200);
+    expect((await (await app(false)).inject({ method: 'GET', url: '/livez' })).statusCode).toBe(
+      200,
+    );
   });
 
   it('answers unknown routes with problem+json and a request id', async () => {
-    const res = await app().inject({ method: 'GET', url: '/api/nope' });
+    const res = await (await app()).inject({ method: 'GET', url: '/api/nope' });
     expect(res.statusCode).toBe(404);
     expect(res.headers['content-type']).toContain('application/problem+json');
     expect(res.json()).toMatchObject({ status: 404, code: 'not_found', instance: '/api/nope' });
@@ -50,13 +54,15 @@ describe('gateway app', () => {
   });
 
   it('hides internal error details', async () => {
-    const res = await app().inject({ method: 'GET', url: '/api/boom' });
+    const res = await (await app()).inject({ method: 'GET', url: '/api/boom' });
     expect(res.statusCode).toBe(500);
     expect(res.body).not.toContain('secret internal detail');
   });
 
   it('reports field-level validation errors', async () => {
-    const res = await app().inject({
+    const res = await (
+      await app()
+    ).inject({
       method: 'POST',
       url: '/api/form',
       payload: { email: 'nope' },
@@ -66,13 +72,17 @@ describe('gateway app', () => {
   });
 
   it('reuses a well-formed incoming X-Request-Id and ignores a malformed one', async () => {
-    const reused = await app().inject({
+    const reused = await (
+      await app()
+    ).inject({
       method: 'GET',
       url: '/livez',
       headers: { 'x-request-id': 'req-12345678' },
     });
     expect(reused.headers['x-request-id']).toBe('req-12345678');
-    const replaced = await app().inject({
+    const replaced = await (
+      await app()
+    ).inject({
       method: 'GET',
       url: '/livez',
       headers: { 'x-request-id': 'bad id!' },

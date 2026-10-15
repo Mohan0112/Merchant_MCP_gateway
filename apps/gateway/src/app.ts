@@ -8,15 +8,17 @@ export interface AppDependencies {
   /** Readiness: resolves when the database answers. Never checks upstream MCP servers. */
   checkDatabase: () => Promise<void>;
   version: { name: string; version: string; commit: string };
+  /** Feature modules (auth, keys, servers, mcp…) add their plugins, hooks and routes here. */
+  register?: (app: FastifyInstance) => Promise<void> | void;
 }
 
 const REQUEST_ID = /^[A-Za-z0-9._-]{8,64}$/;
 
 /**
- * The gateway's HTTP application. Routes are added per feature module; this file holds only the
- * cross-cutting pieces (request ids, error format, health, version).
+ * The gateway's HTTP application. This file holds only the cross-cutting pieces (request ids,
+ * error format, health, version); feature modules are plugged in through `register`.
  */
-export function buildApp(deps: AppDependencies): FastifyInstance {
+export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
     loggerInstance: deps.logger as FastifyBaseLogger,
     // Reuse a well-formed incoming X-Request-Id (e.g. from a test or a proxy), otherwise make one.
@@ -53,5 +55,6 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
 
   app.get('/api/version', async () => deps.version);
 
+  await deps.register?.(app);
   return app;
 }

@@ -63,6 +63,15 @@ spec:
             {{- include "platform.databaseEnv" . | nindent 12 }}
             - name: PUBLIC_BASE_URL
               value: "{{ .Values.global.scheme }}://{{ include "platform.host" . }}"
+            - name: API_KEY_PEPPER
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.secrets.crypto }}, key: api-key-pepper }
+            - name: BOOTSTRAP_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.secrets.bootstrapAdmin }}, key: email }
+            - name: BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.secrets.bootstrapAdmin }}, key: password }
             - name: LOG_LEVEL
               value: {{ .Values.global.logLevel | quote }}
             - name: APP_VERSION

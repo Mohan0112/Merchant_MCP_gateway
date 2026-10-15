@@ -25,7 +25,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 7 | WooCommerce MCP server | ✅ | 6 tools + server_info, 23 tests; in-cluster: today's orders in IST, product created and visible on storefront |
 | 8 | Additional upstreams (fx-mcp, GitHub) | ✅ | fx-mcp deployed (live rates, header credential); GitHub Issues toolset verified with the PAT |
 | 9 | Gateway skeleton and platform sub-chart | ✅ | Fastify app, schema v1 (8 tables), migrate initContainer, PostgreSQL 17.11, Ingress app.&lt;domain&gt;/api,/mcp |
-| 10 | Identity and access | ⏳ | |
+| 10 | Identity and access | ✅ | Sessions, invites, roles, API keys (HMAC), CSRF guard, login throttling; 20 DB-backed tests |
 | 11 | Upstream registry and connection manager | ⏳ | |
 | 12 | Aggregating MCP endpoint and audit log | ⏳ | |
 | 13 | Dashboard foundation | ⏳ | |
@@ -108,6 +108,65 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-15 · Task 10: Identity and access · ✅
+
+**What was done**
+- **Shared contracts** (`packages/contracts/src/api.ts`, used by both the gateway and the dashboard):
+  - Login, password, user, invitation, user-update and API-key request/response schemas.
+  - Emails are normalised (trimmed, lower-cased) *before* validation.
+  - Passwords need at least 12 characters, with no composition rules (NIST 800-63B).
+  - The base enums moved to `enums.ts` to avoid an import cycle.
+- **`lib/crypto.ts`** (node:crypto only):
+  - **scrypt** password hashes stored as `scrypt$N$r$p$salt$hash`.
+  - **HMAC-SHA256 + pepper** for API keys; **SHA-256** for session and invite tokens; constant-time digest comparison.
+  - Unbiased random alphanumerics.
+  - **AES-256-GCM** encrypt/decrypt for upstream credentials (used in Task 11).
+- **`lib/rate-limit.ts`:** an in-memory fixed-window limiter, used for login.
+- **`modules/auth`:**
+  - Sessions: an opaque 256-bit cookie token; only its SHA-256 is stored; **12 h idle / 7 day absolute** expiry; activity recorded at most every 5 minutes.
+  - Principal guards: `requireUser` and `requireAdmin`. A **forced password change** blocks every other route.
+  - Users:
+    - Bootstrap admin on an empty DB.
+    - **Last active admin protected.**
+    - **Disabling a user revokes all their keys and ends their sessions.**
+  - Invitations: a one-time link valid for 72 h; only its hash is stored; 410 when used, expired or revoked.
+  - Routes:
+    - `/api/auth/login|logout|me|password`; the password change signs out other sessions and must choose a *different* password.
+    - `/api/users`, `/api/invitations`, and `/api/invitations/accept/:token`.
+  - Plugin: cookie parsing, the principal on every request, and **an anti-CSRF guard**: state-changing `/api` calls need `X-Requested-With`.
+  - Login throttled to 5 attempts per minute per IP+email (429 + `Retry-After`). The same message for an unknown email and a wrong password.
+- **`modules/keys`:**
+  - Issue: `umcp_<prefix8>_<secret43>`, plaintext returned once with `Cache-Control: no-store`, max 10 active keys per user, admins may issue for others.
+  - List: own keys, or anyone's for admins. Revoke: owner or admin.
+  - **`verifyApiKey`** (used by the MCP endpoint in Task 12): denials report the owner when known (revoked / expired / user disabled), so they can be audited. A real prefix with a wrong secret counts as *unknown*. `last_used_at` is written at most once a minute.
+- **App:** `buildApp` became async so the cookie plugin loads before the session hook. Feature modules plug in through `register`.
+- **Chart:** the gateway gets `API_KEY_PEPPER` (`gateway-crypto`) and `BOOTSTRAP_ADMIN_EMAIL`/`PASSWORD` (`gateway-bootstrap-admin`).
+- `vitest.config.ts` runs gateway test files one at a time (they share one database). A test harness (`src/test/harness.ts`) gives each test a fresh schema, the full app, and a cookie-keeping "browser".
+
+**Verification**
+- **38 gateway tests pass**, 20 of them new DB-backed end-to-end tests:
+  - **Auth (8):** bootstrap admin created once; identical answers for an unknown email and a wrong password; httpOnly + SameSite=Lax cookie with only the hash stored; forced password change gates admin routes; CSRF header required; **6th bad login → 429**; idle expiry after 12 h; logout.
+  - **Team (5):** invitation accepted once (second use → 410) and signs the user in as a member; expired invitation → 410; members get 403 on admin routes; last admin can't be demoted or disabled (409); disabling a member ends their session immediately.
+  - **Keys (7):** plaintext once, HMAC only in the DB, no plaintext in lists; **valid key verified, then rejected as `revoked` (with owner attribution) right after revocation**; forged secret with a real prefix → `unknown`; lifetime expiry; admin issues and revokes for a member while the member can't touch the admin's keys; 10-key cap (409); disabling a user revokes their keys.
+- Unit: scrypt verify, reject, salt and malformed input; HMAC depends on the pepper; AES-GCM round trip, fresh IV, tamper and wrong-key detection; rate limiter windows.
+- Deployed **revision 9**. The bootstrap admin was created from the Secret (`role admin`, `must_change_password = t`).
+- Through the ingress:
+  - Login without `X-Requested-With` → **403**; wrong password → **401**; correct → **200**.
+  - `Set-Cookie: urumi_session=…; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax` (`Secure` is added automatically on https).
+  - `/me` → admin with `mustChangePassword: true`; `/api/users` → **403 `password_change_required`**.
+  - Logout → 204, then `/me` → 401.
+  - The admin password was deliberately **not** changed, so the owner sees the forced change at first login.
+
+**Problems and fixes**
+1. **scrypt memory.** The plan's N=2^17 (r=8, p=1) needs about 128 MiB per hash, so concurrent logins could exhaust the 512 Mi gateway pod. Switched to OWASP's equivalent **N=2^15, r=8, p=3** (about 32 MiB per hash, same cost). The parameters are stored with each hash, so they can be raised later.
+2. **An import cycle in contracts** (`api.ts` ↔ `index.ts`). The base enums moved to `enums.ts`.
+3. **`z.email()` before normalising** would have rejected `" Asha@Example.com "`. The schema now trims and lower-cases first, then validates.
+4. **Hook ordering:** the session hook must run after `@fastify/cookie` has parsed cookies, so `buildApp` awaits plugin registration before adding hooks.
+5. A Windows tooling quirk while verifying: `curl.exe` wrote the cookie jar to `C:\tmp`, while Git Bash's `grep` read its own `/tmp`. Verified the cookie flags from the `Set-Cookie` header instead and removed the stray file. `.prettierignore` now excludes drizzle-kit's generated metadata.
+
+**Follow-ups**
+- Task 11: upstream registry, credential vault and connection manager. Task 12: the MCP endpoint uses `verifyApiKey` and writes audit rows for denials too.
 
 ### 2026-10-15 · Task 9: Gateway skeleton and platform sub-chart · ✅
 

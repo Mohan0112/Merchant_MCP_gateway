@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Document** | Engineering plan and technical design |
-| **Version** | 1.2 (right-sized after external review; VPS deferred) |
+| **Version** | 1.3 (right-sized after external review; VPS deferred; updated with Task 3 spike findings) |
 | **Date** | 2026-10-15 |
 | **Source brief** | Urumi AI FDE Internship, Round 1: MCP Gateway on Kubernetes (kept outside this repository) |
 | **Code location** | `URUMI.ai/Project/` (git repository root), pushed to [github.com/Mohan0112/Merchant_MCP_gateway](https://github.com/Mohan0112/Merchant_MCP_gateway) |
@@ -38,6 +38,7 @@ An external review argued that v1.0 was sized like a multi-month enterprise plat
 | VPS | Provisioned at Task 19, multi-arch images built anywhere | Oracle signup and k3s install in Task 2; arm64 images built on GitHub's native arm64 runners (no emulation); x86 fallback | Oracle capacity is the slowest external dependency |
 | Simplified to Phase 2 | — | Encryption-key versioning, DB-level append-only grants, Postgres advisory locks, bulkheads | Not needed for a single-replica core |
 | **v1.2:** VPS | Oracle provisioning in Task 2 | VPS deferred; Task 19 becomes a production rehearsal on a local cluster; live deployment moves to Phase 2 Task 31; CI builds amd64 only until an ARM VPS needs arm64 | Oracle signup was slow and failing; the brief requires *deployability*, which the rehearsal and runbook prove |
+| **v1.3:** spikes | v1 MCP SDK, stateful sessions, WordPress 6, Llama model | MCP SDK v2 with a stateless endpoint (ADR-0003); WordPress 7.1.3 + WooCommerce 11.2.1; Groq `openai/gpt-oss-120b` + Gemini `gemini-2.5-flash`; Basic Auth via mu-plugin confirmed (ADR-0002) | Task 3 spikes, see `docs/spikes.md` |
 
 ---
 
@@ -369,7 +370,7 @@ Version numbers are pinned in Task 1 to the latest stable release at that point.
 |---|---|---|---|
 | Language and runtime | **TypeScript (strict)** on **Node.js 24 LTS** | One language for UI and services; the MCP TS SDK is the reference implementation; shared types and schemas | Python + FastAPI (strong SDK, but two languages), Go |
 | Monorepo | **pnpm workspaces + Turborepo** | Fast, disk-efficient installs; cached task graph across apps | Nx (heavier), npm workspaces (slower) |
-| MCP | **`@modelcontextprotocol/sdk`** (TypeScript), Streamable HTTP transport, spec 2025-11-25 or newer | Official client and server; handles protocol negotiation and sessions | Hand-rolled JSON-RPC (error-prone) |
+| MCP | **MCP TypeScript SDK v2**: `@modelcontextprotocol/server`, `/client`, `/node`, `/fastify` (2.3.x), spec 2026-07-28 with 2025-era fallback | Official client and server; stateless per-request handler; version auto-negotiation (ADR-0003) | v1 `@modelcontextprotocol/sdk` (legacy line), hand-rolled JSON-RPC |
 | HTTP framework | **Fastify 5** | Schema-first, fast, pino logging built in, encapsulated plugins | Express 5 (simpler, slower), NestJS (heavier DI framework) |
 | Validation and contracts | **Zod 4** in a shared `packages/contracts` | One schema drives REST validation, OpenAPI, UI forms and MCP tool input schemas | TypeBox, io-ts |
 | Database | **PostgreSQL 17** | Relational integrity for users, keys and audit; JSONB for tool schemas; strong indexing | SQLite (blocks multi-replica), MySQL |
@@ -378,7 +379,7 @@ Version numbers are pinned in Task 1 to the latest stable release at that point.
 | Resilience | **`AbortSignal.timeout`** on every call plus a small consecutive-failure counter per upstream | Same protection as a circuit breaker for this scale, easy to read | cockatiel, opossum (Phase 2 if needed) |
 | HTTP client | **undici** (Node's built-in fetch engine) | Per-request timeouts; custom DNS lookup needed for SSRF pinning in Phase 2 | axios |
 | Logging | **pino** with redaction paths | Fast JSON logs; secrets redacted centrally | winston |
-| LLM access | **`openai` SDK pointed at OpenAI-compatible endpoints**; Groq by default (e.g. `llama-3.3-70b-versatile` or `openai/gpt-oss-120b`), Gemini Flash as fallback; confirm current free-tier models in Task 3 | Free tier, reliable tool calling, provider swap by config only | Vercel AI SDK (hides the tool loop we must show), LangChain (heavy) |
+| LLM access | **`openai` SDK pointed at OpenAI-compatible endpoints**; Groq `openai/gpt-oss-120b` by default, Gemini `gemini-2.5-flash` as fallback (verified in Task 3) | Free tier, reliable tool calling, provider swap by config only | Vercel AI SDK (hides the tool loop we must show), LangChain (heavy) |
 | WooCommerce integration | **WooCommerce REST API v3** through our own typed client, HTTP Basic Auth with the REST key | Stable, versioned contract; business hooks run; no pod exec needed (see ADR-002) | OAuth 1.0a signing, WP-CLI via `kubectl exec`, direct SQL |
 
 ### 6.2 Frontend
@@ -398,7 +399,7 @@ Version numbers are pinned in Task 1 to the latest stable release at that point.
 
 | Concern | Choice | Why |
 |---|---|---|
-| CMS and commerce | **WordPress 6.x (PHP 8.3, Apache) + WooCommerce** (pinned) + **Storefront** theme | Official images and versions WooCommerce supports |
+| CMS and commerce | **WordPress 7.1.3 (PHP 8.4, Apache) + WooCommerce 11.2.1** + **Storefront 4.6.2** (all pinned; WooCommerce 11 requires WordPress 7) | Official images and versions WooCommerce supports |
 | Database | **MariaDB 11.4 LTS** | Lighter than MySQL; WooCommerce supported |
 | Tooling | **WP-CLI** baked into our image | Idempotent bootstrap and cron |
 | Packaging | **Our own Helm chart** (no Bitnami) | Bitnami's free catalog was cut back in 2025; owning the chart is safer and teaches more |
@@ -592,7 +593,7 @@ Each ADR becomes a short file in `docs/adr/` (context, decision, consequences, a
 | ADR-010 | Our own Helm templates for WordPress and MariaDB | Bitnami catalog changes; full control over probes and security | More templates to maintain |
 | ADR-011 | WordPress code baked into an image; only DB and `wp-content/uploads` are persistent; `DISALLOW_FILE_MODS` on | Reproducible builds, image-tag upgrades and rollbacks, smaller attack surface | Plugins can't be installed from wp-admin (intended) |
 | ADR-012 | k3d locally, k3s in production | Same distribution, ingress, storage and NetworkPolicy engine | k3d needs Docker Desktop on Windows |
-| ADR-013 | Gateway MCP endpoint is stateful (`Mcp-Session-Id`) in core; the multi-replica strategy is decided in Phase 2 | Server-to-client `list_changed` notifications work | Sessions are in memory until Task 25 |
+| ADR-013 | **Superseded by ADR-0003 (v1.3):** stateless MCP endpoint on SDK v2 (`createMcpHandler`), `list_changed` via `subscriptions/listen` | Re-authenticates every request; scales by sharing only the event bus | 2025-era clients see tool changes on re-list |
 | ADR-014 | Feature modules instead of strict hexagonal layering; interfaces only at three seams | Less code, same testability where it matters, easy to explain | Fewer compile-time guarantees about layering |
 
 ### 7.5 Repository structure
@@ -848,12 +849,14 @@ stateDiagram-v2
 
 The dashboard maps `Connected` to **Connected**, `Connecting` to **Connecting…** (briefly), `Unreachable` to **Unreachable** with reason, and `Disabled` to **Disabled**.
 
-#### 8.1.7 MCP session handling on the gateway
+#### 8.1.7 MCP request handling on the gateway (v1.3: stateless, see ADR-0003)
 
-- Stateful Streamable HTTP: `initialize` issues an `Mcp-Session-Id`. The session map holds the transport, the per-session MCP `Server`, the owner `userId`, the `apiKeyId` and `lastSeen`.
-- **Every HTTP request re-authenticates** the bearer token, so a revoked key fails immediately even inside an open session. The session's owner must match the token's user; otherwise the gateway answers 404 so that session IDs can't be probed.
-- The `GET /mcp` SSE stream carries `notifications/tools/list_changed`.
-- Idle sessions expire after 30 minutes. `DELETE /mcp` ends a session. Each user can hold at most 20 sessions; the least recently used one is evicted.
+- The endpoint is built with the MCP SDK v2's `createMcpHandler(factory)`. A Fastify route first verifies the bearer credential (API key or chat token) and passes the resulting `authInfo`.
+- The factory runs **per HTTP request**. It receives `{ era, authInfo }` and builds a low-level `Server` whose `tools/list` returns the caller's view of the catalog and whose `tools/call` runs `invokeTool()`. Nothing is held between requests, so a revoked key fails on the very next request and restarts lose nothing.
+- **Change notifications:** on `catalog.changed` the gateway calls `handler.notify.toolsChanged()`.
+  - **2026-07-28 clients** (Claude Code 2.1.300, verified in Spike B) receive `notifications/tools/list_changed` on their `subscriptions/listen` stream.
+  - **2025-era clients** (for example MCP Inspector 2.11) are served statelessly and see changes on their next `tools/list`.
+- Multi-replica fan-out of change events needs a shared `ServerEventBus` (Phase 2, Task 25).
 - Upstream connections are **shared per server**, not per user, because the upstream credential is a shared static credential. The user's identity stays at the gateway (audit, permissions) and is never sent upstream.
 
 #### 8.1.8 Error mapping
@@ -2137,7 +2140,7 @@ Goal: prove the riskiest integrations with throwaway code in `spikes/`, deleted 
 **Lane:** Platform · **Size:** L · **Depends on:** Task 2 · **Parallel with:** Tasks 3, 9
 
 Goal: WordPress and MariaDB running on Kubernetes with persistence, probes and limits.
-- [ ] `docker/wordpress/Dockerfile`: pinned `wordpress:6.x-php8.3-apache` base, WP-CLI, pinned WooCommerce and Storefront baked in, `healthz.php`, the `urumi-internal-https.php` mu-plugin. `wp-config` extras: reverse-proxy HTTPS detection, `DISABLE_WP_CRON`, `DISALLOW_FILE_MODS`.
+- [ ] `docker/wordpress/Dockerfile`: pinned `wordpress:7.1.3-php8.4-apache` base, WP-CLI, pinned WooCommerce and Storefront baked in, `healthz.php`, the `urumi-internal-https.php` mu-plugin. `wp-config` extras: reverse-proxy HTTPS detection, `DISABLE_WP_CRON`, `DISALLOW_FILE_MODS`.
 - [ ] `store` sub-chart: MariaDB 11.4 StatefulSet with headless Service, `volumeClaimTemplates` and `healthcheck.sh` probes.
 - [ ] WordPress Deployment (`Recreate`), uploads PVC, Service, Ingress `store.DOMAIN`.
 - [ ] `existingSecret` references for DB credentials, salts and the admin account.

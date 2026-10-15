@@ -18,7 +18,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 |---|---|---|---|
 | 1 | Repository and engineering baseline | ✅ | Monorepo, lint, typecheck, tests, CI workflow, gitleaks rule |
 | 2 | Local Kubernetes platform | ✅ | k3d cluster, registry, Traefik timeouts, nip.io domains, NetworkPolicy proven |
-| 3 | Technical spikes | ⏳ | |
+| 3 | Technical spikes | ✅ | Woo Basic Auth ✅, MCP SDK v2 gateway + Claude Code ✅, Groq/Gemini tool loop ✅ |
 | 4 | Store image and sub-chart | ⏳ | |
 | 5 | Store bootstrap and checkout | ⏳ | |
 | 6 | MCP server kit and sub-chart | ⏳ | |
@@ -98,6 +98,35 @@ Common problems:
 
 ## Log
 
+### 2026-10-15 · Task 3: Technical spikes · ✅
+
+Full write-up with every test result: [spikes.md](spikes.md). Decisions: [ADR-0002](adr/0002-woocommerce-rest-basic-auth.md) and [ADR-0003](adr/0003-mcp-sdk-v2-stateless-gateway.md). The spike code ran outside the repository and was deleted; only the findings are kept.
+
+**What was done**
+- **Spike A (WooCommerce auth).** Docker: MariaDB 11.4 + WordPress 7.1.3 + WP-CLI + WooCommerce 11.2.1, a `shop_manager` user, a REST key inserted with `wc_api_hash()`, and the internal-HTTPS mu-plugin.
+  - Basic Auth via the internal host: 200. Same credentials with the public `Host`: 401. No credentials: 401.
+  - Create product: 201. List orders: 200. `shop_manager` blocked from plugins.
+- **Spike B (MCP SDK + clients).** A mini upstream and a mini gateway on **MCP SDK v2** (`createMcpHandler`, low-level `Server`, upstream `Client` in auto mode, Fastify adapter).
+  - Namespacing and forwarding work. A 2 s timeout on a 5 s upstream gives a clear error.
+  - A modern client received `list_changed` after the upstream was disabled. A 2025-era client is served statelessly.
+  - A wrong key gets 401. The audit lines carry the right user.
+  - **Claude Code 2.1.300 connected (`✔ Connected`) and negotiated the 2026 protocol. MCP Inspector 2.11 CLI listed the tools (2025 protocol).**
+- **Spike C (LLM tool loop).** `openai` SDK 7.34 with Zod v4 JSON Schemas.
+  - Groq `openai/gpt-oss-120b` (2.3 s), `openai/gpt-oss-20b` (1.4 s) and Gemini `gemini-2.5-flash` (7.3 s) all produced the correct two-step tool chain and answer.
+- Plan updated to **v1.3**: tech stack rows, ADR-013 superseded, §8.1.7 rewritten, Task 4 base image.
+
+**Problems and fixes**
+1. **`wp plugin install woocommerce` failed:** "Minimum WordPress requirement is 7.0". `wordpress:6-php8.3-apache` ships WordPress 6.x, and WooCommerce 11.2.1 needs 7.0+. Fix: pin `wordpress:7.1.3-php8.4-apache` and `wordpress:cli-php8.4`.
+2. **The MCP SDK changed major version.** v2 split packages implement the 2026-07-28 spec, with a stateless per-request handler and a new change-subscription mechanism. Read the v2 docs and typings, then validated the design with real code and real clients. Outcome: the stateless gateway (ADR-0003) replaces the planned session map.
+3. **WordPress reports `https://` permalinks on internal requests**, a side effect of the mu-plugin. `woo-mcp` will rewrite store URLs to `STORE_PUBLIC_URL` (Task 7).
+4. **The Llama 3.3 model is no longer in Groq's catalog.** Default is now `openai/gpt-oss-120b`.
+5. Claude Code isn't on the shell PATH. The VS Code extension's binary at `%USERPROFILE%\.vscode\extensions\anthropic.claude-code-<version>-win32-x64\resources\native-binary\claude.exe` was used. The temporary `spike-gw` MCP entry was removed from `~/.claude.json` afterwards.
+
+**Follow-ups**
+- Task 4 uses WordPress 7.1.3 / PHP 8.4 and bakes in WooCommerce 11.2.1, Storefront 4.6.2 and the mu-plugin.
+- Task 6 (`mcp-kit`) and Task 12 (gateway) build on the v2 APIs exactly as in Spike B.
+- The demo can show tools disappearing live in Claude Code (modern protocol). In MCP Inspector, click "List tools" again.
+
 ### 2026-10-15 · Task 2: Local Kubernetes platform · ✅
 
 **What was done**
@@ -171,5 +200,5 @@ Common problems:
 5. The first `pnpm install` took about 200 s, probably because of OneDrive sync. Watching it; no action yet.
 
 **Follow-ups**
-- CI runs for the first time after the first push (needs the owner's go-ahead to push to the public repo).
+- ~~CI runs for the first time after the first push.~~ Done. The first run failed only in the gitleaks job: `gitleaks-action` builds a `first-commit^..last` range, which doesn't exist on a repository's first push. Fixed in commit `2f5a80a` by running the pinned `ghcr.io/gitleaks/gitleaks:v8.30.1` image over the full history. Actions were also bumped to Node 24 versions (checkout v7, setup-node v7, pnpm/action-setup v6, setup-helm v5). CI is green on all three jobs.
 - `packages/mcp-kit` is created in Task 6, when it gets real content.

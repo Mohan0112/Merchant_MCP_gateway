@@ -5,8 +5,15 @@ global:
   # Base domain. Hosts are store.<domain> and app.<domain>.
   domain: example.com
   ingressClassName: traefik
+  tls:
+    # Production terminates TLS at Traefik with certificates from cert-manager.
+    enabled: false
+    clusterIssuer: ''
 
 traefik:
   # Render a k3s HelmChartConfig that raises Traefik's timeouts so long-lived SSE streams
   # (GET /mcp, /api/chat) aren't cut after the default 60 s read timeout.
   configureTimeouts: true
+
+store:
+  enabled: true

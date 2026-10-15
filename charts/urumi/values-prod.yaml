@@ -1,3 +1,26 @@
-# Production-like VPS running k3s (Task 31). Filled in during Task 19.
+# Production-like VPS running k3s (Task 31; rehearsed locally in Task 19).
 global:
   domain: CHANGE-ME.duckdns.org
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+
+store:
+  wordpress:
+    image:
+      repository: ghcr.io/mohan0112/merchant_mcp_gateway/wordpress
+      tag: CHANGE-ME-git-sha
+      pullPolicy: IfNotPresent
+    scheme: https
+    environmentType: production
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: 1500m, memory: 768Mi }
+    persistence:
+      size: 5Gi
+  mariadb:
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: 1000m, memory: 1Gi }
+    persistence:
+      size: 10Gi

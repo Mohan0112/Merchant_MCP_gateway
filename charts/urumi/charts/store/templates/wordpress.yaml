@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  labels:
+    {{- include "store.labels" (list . "wordpress") | nindent 4 }}
+spec:
+  selector:
+    {{- include "store.selectorLabels" (list . "wordpress") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wp-uploads
+  labels:
+    {{- include "store.labels" (list . "wordpress") | nindent 4 }}
+  annotations:
+    # Keep product images if the release is uninstalled; delete deliberately with `task store:wipe`.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.wordpress.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.wordpress.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  labels:
+    {{- include "store.labels" (list . "wordpress") | nindent 4 }}
+spec:
+  replicas: 1
+  # Recreate, not RollingUpdate: the uploads volume is ReadWriteOnce on node-local storage and can't
+  # be attached to an old and a new pod on different nodes at the same time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "store.selectorLabels" (list . "wordpress") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "store.labels" (list . "wordpress") | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 33
+        runAsGroup: 33
+        fsGroup: 33
+      containers:
+        - name: wordpress
+          image: "{{ .Values.wordpress.image.repository }}:{{ .Values.wordpress.image.tag }}"
+          imagePullPolicy: {{ .Values.wordpress.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            {{- include "store.wordpressEnv" . | nindent 12 }}
+          volumeMounts:
+            - name: uploads
+              mountPath: /var/www/html/wp-content/uploads
+          startupProbe:
+            httpGet: { path: /healthz.php, port: http }
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet: { path: /healthz.php, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          # TCP only: a database outage makes the pod unready but never restarts it.
+          livenessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.wordpress.resources | nindent 12 }}
+          securityContext:
+            {{- include "store.containerSecurityContext" . | nindent 12 }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: wp-uploads

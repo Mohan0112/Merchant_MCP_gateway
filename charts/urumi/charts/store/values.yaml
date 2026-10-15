@@ -1,0 +1,43 @@
+wordpress:
+  image:
+    repository: urumi-registry:5000/urumi-wordpress
+    tag: dev
+    pullPolicy: IfNotPresent
+  # Scheme of the public store URL: http locally, https behind TLS in production.
+  scheme: http
+  environmentType: production
+  # In-cluster Service name. The internal-HTTPS mu-plugin enables Basic Auth only for this Host (ADR-0002).
+  internalHost: wordpress
+  # Honour X-Forwarded-Proto from the ingress so WordPress knows the public request was HTTPS.
+  trustForwardedProto: true
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 1000m, memory: 512Mi }
+  persistence:
+    # wp-content/uploads (product images and other media)
+    size: 1Gi
+    storageClass: ''
+
+mariadb:
+  image:
+    repository: mariadb
+    tag: 11.4.13
+  database: wordpress
+  user: wordpress
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  persistence:
+    size: 2Gi
+    storageClass: ''
+
+# Secrets are created outside the chart by scripts/secrets.mjs (ADR-008); only names live here.
+secrets:
+  # keys: root-password, password
+  db: store-db
+  # keys: auth-key, secure-auth-key, logged-in-key, nonce-key, auth-salt, secure-auth-salt,
+  #       logged-in-salt, nonce-salt, admin-user, admin-email, admin-password
+  wordpress: store-wp
+
+ingress:
+  enabled: true

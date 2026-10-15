@@ -4,9 +4,12 @@ version: '3'
 
 vars:
   CLUSTER: urumi
+  CONTEXT: k3d-urumi
   NAMESPACE: urumi
   RELEASE: urumi
   CHART: charts/urumi
+  REGISTRY: localhost:5001
+  TAG: dev
 
 tasks:
   install:
@@ -37,7 +40,7 @@ tasks:
       - k3d cluster get {{.CLUSTER}}
     cmds:
       - k3d cluster create --config deploy/k3d/cluster.yaml
-      - kubectl config use-context k3d-{{.CLUSTER}}
+      - kubectl config use-context {{.CONTEXT}}
       - kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
   cluster:down:
@@ -50,6 +53,40 @@ tasks:
     cmds:
       - task: cluster:down
       - task: cluster:up
+
+  # ---------- Images ----------
+
+  images:build:
+    desc: Build all images and push them to the local k3d registry
+    cmds:
+      - task: image:wordpress
+
+  image:wordpress:
+    desc: Build and push the WordPress + WooCommerce store image
+    cmds:
+      - docker build -t {{.REGISTRY}}/urumi-wordpress:{{.TAG}} docker/wordpress
+      - docker push {{.REGISTRY}}/urumi-wordpress:{{.TAG}}
+
+  # ---------- Secrets ----------
+
+  secrets:
+    desc: Create or sync the Kubernetes Secrets from .env.local (never prints values)
+    cmds:
+      - node scripts/secrets.mjs --context={{.CONTEXT}} --namespace={{.NAMESPACE}}
+
+  logins:
+    desc: Print the generated wp-admin and dashboard logins (local use only)
+    cmds:
+      - cmd: >-
+          echo "wp-admin   http://store.127.0.0.1.nip.io/wp-admin  user:
+          $(kubectl -n {{.NAMESPACE}} get secret store-wp -o jsonpath='{.data.admin-user}' | base64 -d)
+          password: $(kubectl -n {{.NAMESPACE}} get secret store-wp -o jsonpath='{.data.admin-password}' | base64 -d)"
+        silent: true
+      - cmd: >-
+          echo "dashboard  http://app.127.0.0.1.nip.io            email:
+          $(kubectl -n {{.NAMESPACE}} get secret gateway-bootstrap-admin -o jsonpath='{.data.email}' | base64 -d)
+          password: $(kubectl -n {{.NAMESPACE}} get secret gateway-bootstrap-admin -o jsonpath='{.data.password}' | base64 -d)"
+        silent: true
 
   # ---------- Helm ----------
 
@@ -64,9 +101,15 @@ tasks:
   deploy:local:
     desc: Install or upgrade the release on the local cluster
     cmds:
-      - kubectl config use-context k3d-{{.CLUSTER}}
+      - kubectl config use-context {{.CONTEXT}}
       - >-
         helm upgrade --install {{.RELEASE}} {{.CHART}}
         --namespace {{.NAMESPACE}} --create-namespace
         -f {{.CHART}}/values-local.yaml
         --wait --timeout 10m
+
+  store:wipe:
+    desc: Delete the store's persistent data (database and uploads). Destructive.
+    prompt: This deletes the store database and all uploads. Continue?
+    cmds:
+      - kubectl -n {{.NAMESPACE}} delete pvc wp-uploads data-mariadb-0 --ignore-not-found

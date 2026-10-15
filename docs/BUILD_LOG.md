@@ -19,7 +19,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 1 | Repository and engineering baseline | ✅ | Monorepo, lint, typecheck, tests, CI workflow, gitleaks rule |
 | 2 | Local Kubernetes platform | ✅ | k3d cluster, registry, Traefik timeouts, nip.io domains, NetworkPolicy proven |
 | 3 | Technical spikes | ✅ | Woo Basic Auth ✅, MCP SDK v2 gateway + Claude Code ✅, Groq/Gemini tool loop ✅ |
-| 4 | Store image and sub-chart | ⏳ | |
+| 4 | Store image and sub-chart | ✅ | WordPress 7.1.3 + WooCommerce 11.2.1 image (non-root, :8080), MariaDB 11.4.13, PVCs, Ingress, Secrets script |
 | 5 | Store bootstrap and checkout | ⏳ | |
 | 6 | MCP server kit and sub-chart | ⏳ | |
 | 7 | WooCommerce MCP server | ⏳ | |
@@ -72,6 +72,9 @@ task check              # lint, typecheck and test every package
 pnpm turbo run lint typecheck test --force   # same, ignoring Turborepo's cache
 
 task cluster:up         # create the k3d cluster + registry (no-op if it exists)
+task secrets            # create/sync Kubernetes Secrets from .env.local (prints names only)
+task images:build       # build + push images to the local registry (localhost:5001)
+task logins             # print generated wp-admin / dashboard logins (local only)
 task chart:lint         # helm lint + render with local and prod values
 task deploy:local       # helm upgrade --install urumi on the local cluster
 task cluster:reset      # delete and recreate the cluster (loses all cluster data)
@@ -93,10 +96,62 @@ Common problems:
 - **Slow installs:** the repo lives inside OneDrive. Pause OneDrive sync during big installs (risk R3).
 - **`http://*.127.0.0.1.nip.io` doesn't load:** check the cluster is running (`k3d cluster list`), that nothing else holds port 80 (`Get-NetTCPConnection -LocalPort 80 -State Listen`), and that nip.io resolves (`nslookup store.127.0.0.1.nip.io`). Offline fallback: see `docs/local-domains.md`.
 - **Pod stuck in `ImagePullBackOff` for a local image:** push to `localhost:5001/<name>:<tag>` and reference it as `urumi-registry:5000/<name>:<tag>` in the pod spec.
+- **A pod is stuck in `CreateContainerConfigError`:** a referenced Secret or key is missing. Run `task secrets` and check `kubectl -n urumi describe pod <pod>`.
+- **Running SQL by hand:** pipe it over stdin so PowerShell can't mangle quotes:
+  `echo "SELECT 1;" | kubectl -n urumi exec -i mariadb-0 -- sh -c 'mariadb -uwordpress -p"$MARIADB_PASSWORD" wordpress'`
 
 ---
 
 ## Log
+
+### 2026-10-15 · Task 4: Store image and sub-chart · ✅
+
+**What was done**
+- **Image `docker/wordpress`** (`localhost:5001/urumi-wordpress:dev` locally):
+  - Base `wordpress:7.1.3-php8.4-apache`, with WooCommerce 11.2.1, Storefront 4.6.2 and WP-CLI 2.12.0 baked in.
+  - The internal-HTTPS mu-plugin (ADR-0002), and `healthz.php`, which checks PHP and the DB connection.
+  - The whole site is baked into `/var/www/html`, so the official entrypoint skips its startup copy and code is immutable (ADR-011).
+  - Apache listens on **8080** and the image runs as **uid 33 (non-root)**.
+  - `bootstrap.sh` is a placeholder until Task 5.
+- **Sub-chart `charts/urumi/charts/store`**, wired into the umbrella as a dependency with `condition: store.enabled`:
+  - **MariaDB 11.4.13 StatefulSet** with a headless Service `mariadb`, a 2 Gi `volumeClaimTemplate`, and runs as uid 999. Startup, readiness and liveness probes use the image's `healthcheck.sh`.
+  - **WordPress Deployment** with `strategy: Recreate` (RWO volume) and a Service `wordpress:8080`.
+  - A 1 Gi uploads PVC `wp-uploads` with `helm.sh/resource-policy: keep`.
+  - Probes: startup and readiness on `/healthz.php`; liveness is TCP only, so a DB outage never restarts the web pod.
+  - Restricted security context (drop ALL capabilities, no privilege escalation, seccomp `RuntimeDefault`) on both pods.
+  - `WORDPRESS_CONFIG_EXTRA` sets `WP_HOME`/`WP_SITEURL` from values, `DISABLE_WP_CRON`, `DISALLOW_FILE_MODS`, and `X-Forwarded-Proto` trust.
+  - **Ingress `store`** on `store.<domain>`, with a TLS block and cert-manager annotation when `global.tls.enabled`.
+- **Umbrella values:**
+  - `global.tls` added.
+  - `values-local.yaml`: local registry image, `pullPolicy: Always`, `http`.
+  - `values-prod.yaml`: GHCR image, `https`, TLS via `letsencrypt-prod`, larger volumes and limits.
+  - The schema validates TLS, scheme and image fields.
+- **`scripts/secrets.mjs`** (run as `task secrets`):
+  - Creates every Secret the plan needs: `store-db`, `store-wp`, `store-woo-api`, `woo-mcp-auth`, `fx-mcp-auth`, `platform-db`, `gateway-crypto`, `gateway-bootstrap-admin`, `llm`, `github-mcp`.
+  - Generated values are created once. Values from `.env.local` are re-synced on every run.
+  - Manifests go to `kubectl apply -f -` on **stdin**, so values never appear in a command line or in output.
+- **Taskfile:** `secrets`, `logins` (prints generated logins for the owner), `images:build`/`image:wordpress`, `store:wipe` (asks for confirmation).
+
+**Verification**
+- `task chart:lint`: both values files lint and render.
+- `task deploy:local`: release upgraded in **65 s**. `mariadb-0` (server node) and `wordpress` (agent node) are both `1/1 Running`. Both PVCs `Bound` (`local-path`). Ingress `store.127.0.0.1.nip.io` has an address.
+- Through the ingress: `GET /` returns `302` to `/wp-admin/install.php` (expected until Task 5); `GET /healthz.php` returns `ok`.
+- **Persistence:**
+  - Wrote a row into a test table and a file into `wp-content/uploads`, then deleted `mariadb-0` and the WordPress pod.
+  - After the pods were recreated, the row (`written-before-restart`) and the file (`uploads-before-restart`) were both still there.
+  - The markers were removed afterwards.
+- Deployed pod security contexts: WordPress `runAsUser 33, fsGroup 33, runAsNonRoot`; MariaDB `runAsUser 999, fsGroup 999, runAsNonRoot`.
+- Image sanity check: runs as `uid=33(www-data)`; `wp-content/plugins/woocommerce` and `mu-plugins/urumi-internal-https.php` are present; uploads directory owned by `www-data`; `WP-CLI 2.12.0`; `Listen 8080`.
+
+**Problems and fixes**
+1. **Image size 1.43 GB** on the first build: a MySQL client package, plus a separate `chown -R` layer that duplicated every file. Fix: no MySQL client (`healthz.php` and WP-CLI talk to the DB through PHP), and unzip is purged in the same layer.
+2. **WooCommerce stored twice** (image source tree and document root). Fix: one `RUN` copies WordPress core into `/var/www/html`, unpacks the plugins straight into `wp-content`, and chowns in the same layer. Result: 1.39 GB, of which the official base image is 1.13 GB.
+3. **Non-root plus the official entrypoint:** the entrypoint copies `/usr/src/wordpress` at startup when `/var/www/html` is empty. With the uploads volume mounted inside it, Kubernetes creates root-owned parent folders that the non-root copy can't write into. Fix: bake the site into `/var/www/html` so the copy never runs. The bootstrap Job (Task 5) will use the same files.
+4. My first persistence test failed because PowerShell mangled nested SQL quotes and the `kubectl delete` mixed a pod name with a label selector. Redone in bash with SQL piped over stdin. A tip was added to "Resume or debug".
+
+**Follow-ups**
+- Task 5: the bootstrap Job (install, WooCommerce setup, `mcp-bot` and REST key, sample products) and the wp-cron CronJob.
+- NetworkPolicies for `mariadb` and `wordpress` come in Task 17 (plan §10.8).
 
 ### 2026-10-15 · Task 3: Technical spikes · ✅
 

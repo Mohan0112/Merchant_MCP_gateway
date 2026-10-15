@@ -58,7 +58,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
     db: createDatabase(pool),
     logger: quietLogger,
     settings: {
-      apiKeyPepper: 'test-pepper-0123456789abcdef0123456789',
+      apiKeyPepper: randomBytes(32).toString('base64url'),
       credentialKey: randomBytes(32),
       cookieSecure: false,
       publicBaseUrl: 'http://app.test',

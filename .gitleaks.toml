@@ -10,3 +10,13 @@ id = "urumi-gateway-api-key"
 description = "URUMI MCP gateway API key"
 regex = '''umcp_[A-Za-z0-9]{8}_[A-Za-z0-9_-]{43}'''
 keywords = ["umcp_"]
+
+# Reviewed false positive. Commit 79210b3 hard-coded a dummy pepper in the gateway's test harness.
+# It was never a real secret (deployments get a random pepper in the gateway-crypto Secret from
+# scripts/secrets.mjs) and the harness now generates a random one per run. The full-history scan
+# still sees the old line, so this allowlist names exactly that value in exactly that file.
+[[allowlists]]
+description = "Dummy pepper of the test harness (commit 79210b3)"
+condition = "AND"
+paths = ['''^apps/gateway/src/test/harness\.ts$''']
+regexes = ['''test-pepper-0123456789abcdef0123456789''']

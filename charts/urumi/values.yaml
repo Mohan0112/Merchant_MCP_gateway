@@ -5,6 +5,7 @@ global:
   # Base domain. Hosts are store.<domain> and app.<domain>.
   domain: example.com
   ingressClassName: traefik
+  logLevel: info
   tls:
     # Production terminates TLS at Traefik with certificates from cert-manager.
     enabled: false
@@ -17,3 +18,22 @@ traefik:
 
 store:
   enabled: true
+
+# WooCommerce MCP server (Task 7). Bearer credential from Secret woo-mcp-auth.
+woo-mcp:
+  enabled: false
+  image:
+    repository: urumi-registry:5000/urumi-woo-mcp
+    tag: dev
+
+# Currency MCP server. Header credential (X-API-Key) from Secret fx-mcp-auth.
+fx-mcp:
+  enabled: true
+  image:
+    repository: urumi-registry:5000/urumi-fx-mcp
+    tag: dev
+  secretEnv:
+    FX_API_KEY: { secret: fx-mcp-auth, key: api-key }
+  resources:
+    requests: { cpu: 25m, memory: 48Mi }
+    limits: { cpu: 200m, memory: 128Mi }

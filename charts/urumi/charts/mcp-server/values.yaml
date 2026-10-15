@@ -1,0 +1,27 @@
+# One in-cluster MCP server. The umbrella chart uses this sub-chart once per server through an
+# alias, and the alias becomes the resource name (woo-mcp, fx-mcp, …).
+# There is deliberately no Ingress template: MCP servers are reachable only from the gateway.
+
+image:
+  repository: ''
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicas: 1
+port: 8080
+
+# Plain environment variables.
+env: {}
+
+# Environment variables read from Secrets: { ENV_NAME: { secret: name, key: key } }
+secretEnv: {}
+
+networkPolicy:
+  enabled: true
+  # Pods (same namespace) allowed to call this server. Only the gateway, by default.
+  allowFromPods:
+    - app.kubernetes.io/name: gateway
+
+resources:
+  requests: { cpu: 25m, memory: 64Mi }
+  limits: { cpu: 250m, memory: 192Mi }

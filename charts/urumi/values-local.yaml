@@ -2,6 +2,7 @@
 # (see docs/local-domains.md). Images come from the k3d registry (push to localhost:5001).
 global:
   domain: 127.0.0.1.nip.io
+  logLevel: debug
 
 store:
   wordpress:
@@ -11,3 +12,11 @@ store:
       pullPolicy: Always
     scheme: http
     environmentType: local
+
+woo-mcp:
+  image:
+    pullPolicy: Always
+
+fx-mcp:
+  image:
+    pullPolicy: Always

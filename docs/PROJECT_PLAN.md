@@ -975,7 +975,7 @@ classDiagram
 | `fx` (`fx-mcp`, ours) | In cluster | Custom header `X-API-Key` | `convert_currency`, `get_exchange_rate`, `list_currencies`, `server_info` | Kill-pod demo; cross-server prompts; shows the **header** credential type; planned `server_info` collision |
 | `github` (GitHub remote MCP) | Internet, HTTPS | Bearer: fine-grained PAT limited to one demo repo (Issues read/write) | Issues toolset (scoped toolset URL, verified in Task 8) | External upstream; **bearer** credential members never see; three-server prompt |
 
-`fx-mcp` gets ECB reference rates from the free Frankfurter API with a 1-hour cache and falls back to a static rate table from a ConfigMap, so the demo stays deterministic without internet.
+`fx-mcp` gets daily rates from the free, key-less currency-api on the jsDelivr CDN (with a mirror), caches them for an hour, and falls back to a built-in static table, so the demo stays deterministic without internet.
 
 **Cross-server demo prompts**
 - "What was today's order revenue in USD?" uses `woo__list_orders` and `fx__convert_currency`.
@@ -2198,7 +2198,7 @@ Goal: the five required tools (plus `get_product` and `server_info`) against the
 **Lane:** MCP · **Size:** S · **Depends on:** Task 6 · **Parallel with:** Task 7
 
 Goal: two more upstreams that show both credential types and cross-server prompts.
-- [ ] `fx-mcp`: `convert_currency`, `get_exchange_rate`, `list_currencies`, `server_info`; Frankfurter with a 1-hour cache and a ConfigMap fallback; `X-API-Key` header credential. Enabled in the umbrella as `fx-mcp`.
+- [ ] `fx-mcp`: `convert_currency`, `get_exchange_rate`, `list_currencies`, `server_info`; currency-api (jsDelivr CDN + mirror) with a 1-hour cache and a built-in static fallback (Frankfurter was unreachable from this network, Task 6 log); `X-API-Key` header credential. Enabled in the umbrella as `fx-mcp`.
 - [ ] Verify the GitHub remote MCP endpoint and Issues toolset URL with Inspector, using `GITHUB_MCP_PAT` from `.env.local`.
 - [ ] Write down the cross-server demo prompts (§8.3).
 

@@ -21,9 +21,9 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 3 | Technical spikes | ✅ | Woo Basic Auth ✅, MCP SDK v2 gateway + Claude Code ✅, Groq/Gemini tool loop ✅ |
 | 4 | Store image and sub-chart | ✅ | WordPress 7.1.3 + WooCommerce 11.2.1 image (non-root, :8080), MariaDB 11.4.13, PVCs, Ingress, Secrets script |
 | 5 | Store bootstrap and checkout | ✅ | Idempotent bootstrap Job, wp-cron CronJob, COD checkout via Store API → order #14 visible in admin |
-| 6 | MCP server kit and sub-chart | ⏳ | |
+| 6 | MCP server kit and sub-chart | ✅ | `@urumi/mcp-kit` (11 tests), generic `mcp-server` chart (no Ingress, gateway-only NetworkPolicy), shared Node image |
 | 7 | WooCommerce MCP server | ⏳ | |
-| 8 | Additional upstreams (fx-mcp, GitHub) | ⏳ | |
+| 8 | Additional upstreams (fx-mcp, GitHub) | ✅ | fx-mcp deployed (live rates, header credential); GitHub Issues toolset verified with the PAT |
 | 9 | Gateway skeleton and platform sub-chart | ⏳ | |
 | 10 | Identity and access | ⏳ | |
 | 11 | Upstream registry and connection manager | ⏳ | |
@@ -97,12 +97,75 @@ Common problems:
 - **`http://*.127.0.0.1.nip.io` doesn't load:** check the cluster is running (`k3d cluster list`), that nothing else holds port 80 (`Get-NetTCPConnection -LocalPort 80 -State Listen`), and that nip.io resolves (`nslookup store.127.0.0.1.nip.io`). Offline fallback: see `docs/local-domains.md`.
 - **Pod stuck in `ImagePullBackOff` for a local image:** push to `localhost:5001/<name>:<tag>` and reference it as `urumi-registry:5000/<name>:<tag>` in the pod spec.
 - **A pod is stuck in `CreateContainerConfigError`:** a referenced Secret or key is missing. Run `task secrets` and check `kubectl -n urumi describe pod <pod>`.
+- **A brand-new pod can't reach a NetworkPolicy-protected service for its first few seconds.** k3s's policy engine (kube-router) adds a new pod's IP to the allow-list a moment after the pod starts. Probe pods must wait (about 10 s) before testing, and services must retry upstream connections at startup.
+- **Testing an MCP server by hand from inside the cluster:** run a pod labelled `app.kubernetes.io/name=gateway` (the only label the policy admits), inject the credential with `valueFrom.secretKeyRef` through `--overrides`, wait for the policy to sync, then pipe a script over stdin (`kubectl exec -i pod -- sh < script.sh`).
 - **Running SQL by hand:** pipe it over stdin so PowerShell can't mangle quotes:
   `echo "SELECT 1;" | kubectl -n urumi exec -i mariadb-0 -- sh -c 'mariadb -uwordpress -p"$MARIADB_PASSWORD" wordpress'`
 
 ---
 
 ## Log
+
+### 2026-10-15 · Tasks 6 and 8: MCP server kit, generic chart, fx-mcp and the GitHub upstream · ✅
+
+Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first real consumer it verified the kit, the image pipeline and the chart end to end. Task 7 (`woo-mcp`) builds on the same pieces next.
+
+**What was done**
+- **`packages/mcp-kit`**, used by every MCP server we write:
+  - `createMcpHttpServer()`: MCP SDK v2 stateless handler (ADR-0003) on Fastify with our redacting logger.
+  - **Host allow-list** on `/mcp` (`hostHeaderValidation`, DNS-rebinding protection).
+  - Static credential, bearer or custom header, compared in constant time (`credential.ts`).
+  - `/livez` and `/readyz` (probe logs muted to warn).
+  - Shared `server_info` tool; `closeOnSignals()` for graceful SIGTERM.
+  - `ToolHandler` / `defineTool()`: one object per tool. `ToolError` messages are returned to the caller as `isError` results; any other exception is logged and reported as "failed unexpectedly (incident …)" without internals.
+- **`charts/urumi/charts/mcp-server`**, a generic sub-chart used through **aliases** (`woo-mcp`, `fx-mcp`); the alias becomes the resource name.
+  - Deployment with `maxUnavailable 0`, non-root uid 65532, read-only root filesystem, all capabilities dropped, seccomp `RuntimeDefault`, no service-account token. Probes on `/livez` and `/readyz`.
+  - ClusterIP Service. `MCP_ALLOWED_HOSTS` set automatically to every in-cluster form of the Service name.
+  - Env from Secrets through `secretEnv`.
+  - **NetworkPolicy allowing only `app.kubernetes.io/name=gateway` pods.**
+  - **No Ingress template at all.**
+- **`docker/node-app/Dockerfile`**, shared by every Node service:
+  - Build stage `node:24-alpine`: `pnpm fetch` from the lockfile (cached layer), then `install --offline`, then `tsup` bundles the app into **one `server.mjs`**.
+  - Runtime stage **`gcr.io/distroless/nodejs24-debian13:nonroot`**: just the bundle, no shell or package manager.
+  - Root `.dockerignore` keeps `.env*`, `.git` and docs out of the build context.
+- **`apps/fx-mcp`:**
+  - Tools: `convert_currency`, `get_exchange_rate`, `list_currencies` (Zod input/output schemas, read-only annotations) plus `server_info`.
+  - `RatesSource` interface with a live source (currency-api on the jsDelivr CDN, then a mirror, 5 s timeout), a static table, and a 1 h cache with fallback.
+  - Header credential `X-API-Key` from Secret `fx-mcp-auth`. Config validated with Zod at startup (fail fast).
+- **GitHub remote MCP** checked as the third upstream (registered in the gateway later): URL `https://api.githubcopilot.com/mcp/x/issues`, bearer = fine-grained PAT.
+- Umbrella chart 0.3.0: `woo-mcp` (disabled until Task 7) and `fx-mcp` dependencies, `global.logLevel`, schema definitions for MCP servers, local and prod image values. Taskfile `image:node APP=…`.
+
+**Verification**
+- `@urumi/mcp-kit`: **11 tests** pass. They cover the tool list including `server_info`, structured output, `ToolError` → `isError`, unexpected errors hidden (secret text not leaked), extra `server_info` fields, wrong key → 401, forged Host → **403**, `/livez` and `/readyz`.
+- `fx-mcp`: **8 tests** (conversion and rounding, same-currency rate, unknown codes → `ToolError`, schema rejects malformed codes, cache TTL, static fallback).
+- The bundled `dist/server.mjs` runs standalone. An MCP client got `convert_currency(1749 INR→USD) = 18.42` from live CDN rates; a wrong key gets 401.
+- Image `urumi-fx-mcp:dev`: 223 MB, built in 35 s.
+- Deployed: `fx-mcp` Ready in seconds (probes unaffected by the NetworkPolicy). In-cluster checks from a gateway-labelled pod:
+
+  | Check | Result |
+  |---|---|
+  | `/livez` | 200 |
+  | MCP without key | **401** |
+  | MCP with key + forged `Host` | **403** |
+  | `initialize` | `serverInfo fx-mcp 0.1.0` |
+  | `convert_currency(499 INR→USD)` | **5.26**, source `cdn.jsdelivr.net`, live rates over the cluster's outbound internet |
+  | Pod **without** the gateway label | **blocked** (curl exit 7) |
+
+- GitHub remote MCP, with the PAT from `.env.local` (never printed):
+  - `/mcp/x/issues`: 2026 protocol, **10 tools**; `list_issues(Mohan0112/Urumi-Challenge-demo-issues)` OK (0 issues).
+  - The full `/mcp/` endpoint has 46 tools. We use the Issues toolset URL to keep the model's tool list small.
+
+**Problems and fixes**
+1. **Fastify typing:** passing a pino logger made Fastify infer a logger-specific instance type. Fixed by typing it as `FastifyBaseLogger`.
+2. **The Host-check test got 200.** Node's `fetch` treats `Host` as a forbidden header and silently drops overrides. The test now uses `node:http`; the check itself was fine (403).
+3. **Fastify 5.12 deprecated `disableRequestLogging`.** Replaced it with per-route `logLevel: 'warn'` on the probes, which also keeps useful request logs for `/mcp`.
+4. **Frankfurter and open.er-api were unreachable from this network** (timeouts / immediate failures). Switched to the key-less **currency-api on jsDelivr** (0.16 s), with a mirror and a static table. The plan's §8.3 and Task 8 lines were updated, and the static INR rate was refreshed to about 95/USD.
+5. **NetworkPolicy "blocked the gateway" in the first test.** Two theories were ruled out first: named vs numeric port (both work) and `--overrides` dropping labels. The real cause is that kube-router adds a **new pod's IP to the allow-list a few seconds after start**, and the probe ran `curl` instantly. With a 10 s wait, the labelled pod gets 200 and others stay blocked. **Consequence for Task 11:** the gateway must retry upstream connections at startup (backoff is already in the design). Debug tips were added above.
+6. `pnpm` blocked esbuild's install script (used by tsup). Approved with `pnpm approve-builds esbuild`.
+
+**Follow-ups**
+- Task 7: `woo-mcp` on the same kit, chart and Dockerfile.
+- `issue_write` on the GitHub upstream is exercised in the demo flow (Task 12 onwards).
 
 ### 2026-10-15 · Task 5: Store bootstrap and checkout · ✅
 

@@ -60,6 +60,16 @@ tasks:
     desc: Build all images and push them to the local k3d registry
     cmds:
       - task: image:wordpress
+      - task: image:node
+        vars: { APP: fx-mcp }
+
+  image:node:
+    desc: Build and push one Node service image (task image:node APP=fx-mcp)
+    requires:
+      vars: [APP]
+    cmds:
+      - docker build -f docker/node-app/Dockerfile --build-arg APP={{.APP}} -t {{.REGISTRY}}/urumi-{{.APP}}:{{.TAG}} .
+      - docker push {{.REGISTRY}}/urumi-{{.APP}}:{{.TAG}}
 
   image:wordpress:
     desc: Build and push the WordPress + WooCommerce store image

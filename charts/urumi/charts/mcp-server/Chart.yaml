@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mcp-server
+description: Generic in-cluster MCP server (used via aliases, e.g. woo-mcp and fx-mcp). Internal only by design.
+type: application
+version: 0.1.0
+appVersion: '0.1.0'

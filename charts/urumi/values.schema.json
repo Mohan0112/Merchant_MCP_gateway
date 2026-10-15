@@ -2,6 +2,29 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": ["global"],
+  "definitions": {
+    "mcpServer": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": { "type": "string", "minLength": 1 }
+          }
+        },
+        "secretEnv": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["secret", "key"],
+            "properties": { "secret": { "type": "string" }, "key": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
   "properties": {
     "global": {
       "type": "object",
@@ -9,6 +32,7 @@
       "properties": {
         "domain": { "type": "string", "minLength": 3 },
         "ingressClassName": { "type": "string" },
+        "logLevel": { "enum": ["trace", "debug", "info", "warn", "error"] },
         "tls": {
           "type": "object",
           "required": ["enabled"],
@@ -25,6 +49,8 @@
         "configureTimeouts": { "type": "boolean" }
       }
     },
+    "woo-mcp": { "$ref": "#/definitions/mcpServer" },
+    "fx-mcp": { "$ref": "#/definitions/mcpServer" },
     "store": {
       "type": "object",
       "properties": {

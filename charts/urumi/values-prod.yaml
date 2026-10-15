@@ -1,6 +1,7 @@
 # Production-like VPS running k3s (Task 31; rehearsed locally in Task 19).
 global:
   domain: CHANGE-ME.duckdns.org
+  logLevel: info
   tls:
     enabled: true
     clusterIssuer: letsencrypt-prod
@@ -24,3 +25,13 @@ store:
       limits: { cpu: 1000m, memory: 1Gi }
     persistence:
       size: 10Gi
+
+woo-mcp:
+  image:
+    repository: ghcr.io/mohan0112/merchant_mcp_gateway/woo-mcp
+    tag: CHANGE-ME-git-sha
+
+fx-mcp:
+  image:
+    repository: ghcr.io/mohan0112/merchant_mcp_gateway/fx-mcp
+    tag: CHANGE-ME-git-sha

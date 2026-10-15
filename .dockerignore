@@ -1,0 +1,15 @@
+# Build context for docker/node-app/Dockerfile (repository root). Keep it small and secret-free.
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.git
+.github
+.env
+.env.*
+!.env.example
+docs
+charts
+deploy
+docker/wordpress
+*.log

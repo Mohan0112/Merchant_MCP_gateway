@@ -20,9 +20,9 @@ app.kubernetes.io/instance: {{ $root.Release.Name }}
 {{- printf "store.%s" .Values.global.domain -}}
 {{- end -}}
 
-{{/* Public storefront URL used for WP_HOME / WP_SITEURL */}}
+{{/* Public storefront URL used for WP_HOME / WP_SITEURL (global.scheme: http locally, https in prod) */}}
 {{- define "store.url" -}}
-{{- printf "%s://%s" .Values.wordpress.scheme (include "store.host" .) -}}
+{{- printf "%s://%s" .Values.global.scheme (include "store.host" .) -}}
 {{- end -}}
 
 {{/* Restricted container security context shared by store containers. */}}

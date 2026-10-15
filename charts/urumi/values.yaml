@@ -4,6 +4,8 @@
 global:
   # Base domain. Hosts are store.<domain> and app.<domain>.
   domain: example.com
+  # Scheme of the public URLs: http locally, https behind TLS in production.
+  scheme: http
   ingressClassName: traefik
   logLevel: info
   tls:
@@ -19,12 +21,23 @@ traefik:
 store:
   enabled: true
 
-# WooCommerce MCP server (Task 7). Bearer credential from Secret woo-mcp-auth.
+# WooCommerce MCP server. Bearer credential from Secret woo-mcp-auth; talks to WordPress over the
+# internal Service with the mcp-bot REST key (ADR-0002).
 woo-mcp:
-  enabled: false
+  enabled: true
   image:
     repository: urumi-registry:5000/urumi-woo-mcp
     tag: dev
+  env:
+    WOO_BASE_URL: http://wordpress:8080
+    STORE_PUBLIC_URL: '{{ .Values.global.scheme }}://store.{{ .Values.global.domain }}'
+  secretEnv:
+    WOO_MCP_TOKEN: { secret: woo-mcp-auth, key: token }
+    WOO_CONSUMER_KEY: { secret: store-woo-api, key: consumer-key }
+    WOO_CONSUMER_SECRET: { secret: store-woo-api, key: consumer-secret }
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 192Mi }
 
 # Currency MCP server. Header credential (X-API-Key) from Secret fx-mcp-auth.
 fx-mcp:

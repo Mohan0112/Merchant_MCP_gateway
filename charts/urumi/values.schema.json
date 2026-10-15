@@ -31,6 +31,7 @@
       "required": ["domain", "ingressClassName", "tls"],
       "properties": {
         "domain": { "type": "string", "minLength": 3 },
+        "scheme": { "enum": ["http", "https"] },
         "ingressClassName": { "type": "string" },
         "logLevel": { "enum": ["trace", "debug", "info", "warn", "error"] },
         "tls": {
@@ -58,7 +59,6 @@
         "wordpress": {
           "type": "object",
           "properties": {
-            "scheme": { "enum": ["http", "https"] },
             "image": {
               "type": "object",
               "properties": {

@@ -22,7 +22,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 4 | Store image and sub-chart | ✅ | WordPress 7.1.3 + WooCommerce 11.2.1 image (non-root, :8080), MariaDB 11.4.13, PVCs, Ingress, Secrets script |
 | 5 | Store bootstrap and checkout | ✅ | Idempotent bootstrap Job, wp-cron CronJob, COD checkout via Store API → order #14 visible in admin |
 | 6 | MCP server kit and sub-chart | ✅ | `@urumi/mcp-kit` (11 tests), generic `mcp-server` chart (no Ingress, gateway-only NetworkPolicy), shared Node image |
-| 7 | WooCommerce MCP server | ⏳ | |
+| 7 | WooCommerce MCP server | ✅ | 6 tools + server_info, 23 tests; in-cluster: today's orders in IST, product created and visible on storefront |
 | 8 | Additional upstreams (fx-mcp, GitHub) | ✅ | fx-mcp deployed (live rates, header credential); GitHub Issues toolset verified with the PAT |
 | 9 | Gateway skeleton and platform sub-chart | ⏳ | |
 | 10 | Identity and access | ⏳ | |
@@ -99,12 +99,63 @@ Common problems:
 - **A pod is stuck in `CreateContainerConfigError`:** a referenced Secret or key is missing. Run `task secrets` and check `kubectl -n urumi describe pod <pod>`.
 - **A brand-new pod can't reach a NetworkPolicy-protected service for its first few seconds.** k3s's policy engine (kube-router) adds a new pod's IP to the allow-list a moment after the pod starts. Probe pods must wait (about 10 s) before testing, and services must retry upstream connections at startup.
 - **Testing an MCP server by hand from inside the cluster:** run a pod labelled `app.kubernetes.io/name=gateway` (the only label the policy admits), inject the credential with `valueFrom.secretKeyRef` through `--overrides`, wait for the policy to sync, then pipe a script over stdin (`kubectl exec -i pod -- sh < script.sh`).
+- **`helm upgrade` fails with "conflict … with kubectl-patch":** Helm 4 applies manifests server-side and tracks field owners. Someone hand-edited a Helm-managed object, so `kubectl` co-owns a field. Don't hand-edit Helm-managed objects. To recover once, run `helm upgrade … --force-conflicts`.
 - **Running SQL by hand:** pipe it over stdin so PowerShell can't mangle quotes:
   `echo "SELECT 1;" | kubectl -n urumi exec -i mariadb-0 -- sh -c 'mariadb -uwordpress -p"$MARIADB_PASSWORD" wordpress'`
 
 ---
 
 ## Log
+
+### 2026-10-15 · Task 7: WooCommerce MCP server · ✅
+
+**What was done**
+- **`apps/woo-mcp`** on `@urumi/mcp-kit`, built as ports and adapters.
+  - **`WooCommercePort`** (`woo/port.ts`): the operations woo-mcp needs, compact output types, and a classified `WooError` (`not_found` / `invalid` / `auth` / `unavailable`).
+  - **`WooRestClient`** adapter:
+    - WooCommerce REST v3 over `http://wordpress:8080` with **Basic Auth** (ADR-0002) and a 10 s timeout.
+    - **GETs retried twice with backoff; writes never retried.**
+    - Error bodies classified; auth failures logged at error level.
+    - Order windows sent as GMT with `dates_are_gmt=true`.
+  - **Mappers:**
+    - **Links rebased onto `STORE_PUBLIC_URL`** (WordPress emits `https://` on the internal path).
+    - HTML stripped from descriptions.
+    - **List views carry no addresses or contact details** (FR-WM-07); `get_order` returns billing details.
+  - **`period.ts`:** `today` / `yesterday` / `last_7_days` / `this_month` resolved to exact UTC bounds **in the store timezone**, using `Intl` only. Daylight-saving safe.
+  - **Tools:**
+    - `list_products`, `get_product`, `create_product` (price given as a number or a string), `list_orders` (period, or `after`/`before` where a date means a whole local day), `get_order`, `update_order_status` (returns the previous status, optional private note), plus the kit's `server_info` (store name, URL, timezone, currency; reports "unreachable" instead of failing).
+    - Every tool has Zod input/output schemas and annotations; `update_order_status` is marked destructive.
+    - Store errors become actionable `ToolError` messages, for example "Order 99999 not found." or "The store is unavailable right now (…)".
+  - Config validated at startup; store settings cached for 10 minutes.
+- **Chart:**
+  - `woo-mcp` alias enabled. Env `WOO_BASE_URL`, plus `STORE_PUBLIC_URL` templated from `global.scheme` and `global.domain`.
+  - Secrets: `woo-mcp-auth` (bearer the gateway sends) and `store-woo-api` (REST key).
+  - The generic chart now runs `tpl` on env values. **`global.scheme`** replaces `store.wordpress.scheme`, so the store and woo-mcp derive URLs from one setting.
+- Taskfile `images:build` now builds woo-mcp too.
+
+**Verification**
+- Unit tests: **23 pass**.
+  - `period.test.ts` (5): IST midnight while UTC is still the previous day, yesterday, last 7 days, month across a year boundary, New York DST fall-back day (25 h).
+  - `rest-client.test.ts` (10), against a fake WooCommerce HTTP server: Basic Auth header, link rebasing, GMT window params, HTML stripping, 404 → `not_found`, GET retried on 503 (3 calls), write not retried (1 call), timeout → `unavailable`, validation message passed through, status update sequence (GET, PUT, POST note), store settings.
+  - `tools.test.ts` (8): tool set; `today` window in Asia/Kolkata; date-only bounds; period + bounds rejected; numeric price → `"499.00"`; not-found and unavailable messages; unknown status rejected.
+- Image built in 48 s. Deployed as revision 7; `woo-mcp` Ready.
+- **In-cluster, as the gateway would call it** (gateway-labelled pod, bearer from the Secret):
+  1. No token → **401**.
+  2. 7 tools listed.
+  3. `list_orders(period=today)` → window `2026-10-15 00:00 → 2026-10-16 00:00` (IST), total 1, order **#14 (Asha Rao)**.
+  4. `create_product(Urumi Water Bottle, 349)` → id 15, price `349.00`, permalink **`http://store.127.0.0.1.nip.io/product/urumi-water-bottle/`** (rebased).
+  5. `get_order(14)` → processing / 499.00 / Cash on delivery.
+  6. `update_order_status` 14 → on-hold, then back to processing (previous status reported both times).
+  7. `get_order(99999)` → `isError`, "Order 99999 not found."
+  8. `server_info` → Urumi Store, public URL, Asia/Kolkata, INR.
+- **Storefront `/shop/` lists "Urumi Water Bottle"** straight after the tool call.
+
+**Problems and fixes**
+1. **`helm upgrade` failed with a server-side-apply conflict** on the `fx-mcp` NetworkPolicy. My `kubectl patch` during the Task 6 investigation had made `kubectl-patch` a co-owner of `.spec.ingress`, and Helm 4 refuses to overwrite fields another manager owns. Recovered with one `helm upgrade --force-conflicts`; the policy is back to Helm-owned (port `http`). Troubleshooting note added above. Lesson: never hand-edit Helm-managed objects.
+
+**Follow-ups**
+- Test data now in the store: product 15 "Urumi Water Bottle" (from the tool test). `task demo:reset` (Task 18) will clean demo data.
+- The gateway (Tasks 9–12) registers `woo` and `fx` from this namespace's Secrets on first boot.
 
 ### 2026-10-15 · Tasks 6 and 8: MCP server kit, generic chart, fx-mcp and the GitHub upstream · ✅
 

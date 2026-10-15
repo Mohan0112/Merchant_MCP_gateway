@@ -61,6 +61,8 @@ tasks:
     cmds:
       - task: image:wordpress
       - task: image:node
+        vars: { APP: woo-mcp }
+      - task: image:node
         vars: { APP: fx-mcp }
 
   image:node:

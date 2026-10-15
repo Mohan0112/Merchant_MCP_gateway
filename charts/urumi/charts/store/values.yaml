@@ -3,8 +3,6 @@ wordpress:
     repository: urumi-registry:5000/urumi-wordpress
     tag: dev
     pullPolicy: IfNotPresent
-  # Scheme of the public store URL: http locally, https behind TLS in production.
-  scheme: http
   environmentType: production
   # In-cluster Service name. The internal-HTTPS mu-plugin enables Basic Auth only for this Host (ADR-0002).
   internalHost: wordpress

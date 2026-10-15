@@ -38,8 +38,9 @@ spec:
             - name: LOG_LEVEL
               value: {{ .Values.global.logLevel | default "info" | quote }}
             {{- range $name, $value := .Values.env }}
+            # Values may reference other values, e.g. "{{ "{{" }} .Values.global.domain {{ "}}" }}".
             - name: {{ $name }}
-              value: {{ $value | quote }}
+              value: {{ tpl (toString $value) $ | quote }}
             {{- end }}
             {{- range $name, $ref := .Values.secretEnv }}
             - name: {{ $name }}

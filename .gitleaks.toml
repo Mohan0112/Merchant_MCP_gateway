@@ -1,0 +1,12 @@
+title = "Merchant MCP Gateway secret scanning"
+
+[extend]
+useDefault = true
+
+# Gateway API keys (format defined in packages/contracts). Tests build sample keys at runtime
+# so no literal key ever appears in the repository.
+[[rules]]
+id = "urumi-gateway-api-key"
+description = "URUMI MCP gateway API key"
+regex = '''umcp_[A-Za-z0-9]{8}_[A-Za-z0-9_-]{43}'''
+keywords = ["umcp_"]

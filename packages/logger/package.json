@@ -1,0 +1,18 @@
+{
+  "name": "@urumi/logger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "pino logger with central secret redaction",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pino": "^10.4.0"
+  }
+}

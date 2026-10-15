@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.turbo
+pnpm-lock.yaml
+charts/**/templates
+
+# Hand-written planning documents keep their own table layout
+docs/**/*.md

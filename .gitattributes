@@ -1,0 +1,7 @@
+# Normalise to LF so shell scripts and YAML built into Linux images work when edited on Windows.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

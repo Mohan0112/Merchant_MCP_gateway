@@ -1,0 +1,27 @@
+version: '3'
+
+# Entry point for every developer workflow. Run `task --list` to see what's available.
+
+vars:
+  CLUSTER: urumi
+
+tasks:
+  install:
+    desc: Install workspace dependencies
+    cmds:
+      - pnpm install
+
+  check:
+    desc: Lint, typecheck and test every package
+    cmds:
+      - pnpm turbo run lint typecheck test
+
+  build:
+    desc: Build every package and app
+    cmds:
+      - pnpm turbo run build
+
+  format:
+    desc: Format the repository with Prettier
+    cmds:
+      - pnpm prettier --write .

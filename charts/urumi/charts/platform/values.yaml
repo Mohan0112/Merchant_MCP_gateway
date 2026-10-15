@@ -4,6 +4,13 @@ gateway:
     tag: dev
     pullPolicy: IfNotPresent
   replicas: 1
+  # MCP servers registered on first boot. Each is applied once; an admin may edit or delete it later.
+  # Example: { slug, displayName, url, authType: none|bearer|header, authHeaderName,
+  #            credentialSecret: { name, key }, timeoutMs }
+  seedUpstreams: []
+  llm:
+    groqModel: openai/gpt-oss-120b
+    geminiModel: gemini-2.5-flash
   resources:
     requests: { cpu: 100m, memory: 160Mi }
     limits: { cpu: 750m, memory: 512Mi }

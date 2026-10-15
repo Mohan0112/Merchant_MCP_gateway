@@ -8,6 +8,8 @@ export interface GatewayContext {
   settings: {
     /** Server-side secret mixed into API key hashes (Secret gateway-crypto). */
     apiKeyPepper: string;
+    /** AES-256-GCM key for upstream credentials at rest (Secret gateway-crypto). */
+    credentialKey: Buffer;
     /** Secure cookies when the public URL is https. */
     cookieSecure: boolean;
     /** Public URL of the dashboard, used to build invitation links. */

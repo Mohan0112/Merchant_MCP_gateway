@@ -66,12 +66,39 @@ spec:
             - name: API_KEY_PEPPER
               valueFrom:
                 secretKeyRef: { name: {{ .Values.secrets.crypto }}, key: api-key-pepper }
+            - name: CREDENTIAL_KEY
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.secrets.crypto }}, key: credential-key }
             - name: BOOTSTRAP_ADMIN_EMAIL
               valueFrom:
                 secretKeyRef: { name: {{ .Values.secrets.bootstrapAdmin }}, key: email }
             - name: BOOTSTRAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef: { name: {{ .Values.secrets.bootstrapAdmin }}, key: password }
+            # In-cluster MCP servers registered on first boot (woo, fx); credentials come from their Secrets.
+            - name: SEED_UPSTREAMS
+              value: {{ include "platform.seedUpstreams" . | quote }}
+            {{- range .Values.gateway.seedUpstreams }}
+            {{- if .credentialSecret }}
+            - name: {{ include "platform.seedCredentialEnv" .slug }}
+              valueFrom:
+                # optional: a missing Secret skips this seed (logged) instead of blocking the pod.
+                secretKeyRef: { name: {{ .credentialSecret.name }}, key: {{ .credentialSecret.key }}, optional: true }
+            {{- end }}
+            {{- end }}
+            # Chat agent models; optional, so the gateway runs (without chat) when the Secret is empty.
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.secrets.llm }}, key: groq-api-key, optional: true }
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.secrets.llm }}, key: gemini-api-key, optional: true }
+            {{- with .Values.gateway.llm }}
+            - name: GROQ_MODEL
+              value: {{ .groqModel | quote }}
+            - name: GEMINI_MODEL
+              value: {{ .geminiModel | quote }}
+            {{- end }}
             - name: LOG_LEVEL
               value: {{ .Values.global.logLevel | quote }}
             - name: APP_VERSION

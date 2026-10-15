@@ -136,3 +136,8 @@ tasks:
     prompt: This deletes the store database and all uploads. Continue?
     cmds:
       - kubectl -n {{.NAMESPACE}} delete pvc wp-uploads data-mariadb-0 --ignore-not-found
+
+  dod:
+    desc: Check the brief's definition of done end to end against the running cluster (CLI_ARGS e.g. -- --skip-chat)
+    cmds:
+      - node scripts/dod-check.mjs --context={{.CONTEXT}} --namespace={{.NAMESPACE}} {{.CLI_ARGS}}

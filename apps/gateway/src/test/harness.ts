@@ -1,12 +1,16 @@
 import { createLogger } from '@urumi/logger';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
+import { randomBytes } from 'node:crypto';
 import { Writable } from 'node:stream';
 import pg from 'pg';
 import { buildApp } from '../app';
+import { createGatewayModules, shutdown, type GatewayModules } from '../compose';
 import type { GatewayContext } from '../context';
 import { createDatabase, runMigrations } from '../db/client';
-import { registerAuthPlugin, registerAuthRoutes } from '../modules/auth/routes';
-import { registerKeyRoutes } from '../modules/keys/routes';
+import type { UpstreamClientFactory } from '../mcp/upstream/client';
+import type { ConnectionOptions } from '../mcp/upstream/connection';
+import { sdkClientFactory } from '../mcp/upstream/sdk-client';
+import type { LlmProvider } from '../modules/chat/llm';
 
 /** Integration tests run against real PostgreSQL when TEST_DATABASE_URL is set; otherwise they skip. */
 export const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -15,15 +19,36 @@ export const quietLogger = createLogger('test', {
   destination: new Writable({ write: (_chunk, _encoding, callback) => callback() }),
 });
 
+/** Fast timings so tests see status changes in milliseconds, not seconds. */
+export const FAST_CONNECTION: ConnectionOptions = {
+  connectTimeoutMs: 1000,
+  listTimeoutMs: 1000,
+  healthIntervalMs: 100,
+  healthFailureThreshold: 2,
+  callFailureThreshold: 3,
+  initialBackoffMs: 50,
+  maxBackoffMs: 200,
+};
+
 export interface Harness {
   app: FastifyInstance;
   ctx: GatewayContext;
+  modules: GatewayModules;
   pool: pg.Pool;
+  /** Starts listening on a random loopback port (needed by the chat agent) and returns the base URL. */
+  listen(): Promise<string>;
   close(): Promise<void>;
 }
 
-/** Fresh schema state, the full gateway app, and a clock tests can move. */
-export async function createHarness(clock = { now: new Date() }): Promise<Harness> {
+export interface HarnessOptions {
+  clock?: { now: Date };
+  factory?: UpstreamClientFactory;
+  provider?: LlmProvider | null;
+}
+
+/** Fresh schema state, the full gateway app with its real module wiring, and a clock tests can move. */
+export async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
+  const clock = options.clock ?? { now: new Date() };
   const pool = new pg.Pool({ connectionString: databaseUrl });
   await runMigrations(pool, 'drizzle');
   await pool.query(
@@ -34,27 +59,40 @@ export async function createHarness(clock = { now: new Date() }): Promise<Harnes
     logger: quietLogger,
     settings: {
       apiKeyPepper: 'test-pepper-0123456789abcdef0123456789',
+      credentialKey: randomBytes(32),
       cookieSecure: false,
       publicBaseUrl: 'http://app.test',
     },
     now: () => clock.now,
   };
+  let baseUrl = '';
+  const modules = createGatewayModules(ctx, {
+    factory: options.factory ?? sdkClientFactory,
+    connection: FAST_CONNECTION,
+    provider: options.provider ?? null,
+    allowedHosts: ['localhost', '127.0.0.1'],
+    version: 'test',
+    mcpUrl: () => `${baseUrl}/mcp`,
+    closeGraceMs: 200,
+  });
   const app = await buildApp({
     logger: quietLogger,
     checkDatabase: async () => {},
     version: { name: 'gateway', version: 'test', commit: 'test' },
-    register: async (instance) => {
-      await registerAuthPlugin(instance, ctx);
-      registerAuthRoutes(instance, ctx);
-      registerKeyRoutes(instance, ctx);
-    },
+    register: modules.register,
   });
+  await modules.start();
   return {
     app,
     ctx,
+    modules,
     pool,
+    async listen() {
+      baseUrl = await app.listen({ port: 0, host: '127.0.0.1' });
+      return baseUrl;
+    },
     async close() {
-      await app.close();
+      await shutdown(app, modules, 500);
       await pool.end();
     },
   };
@@ -65,6 +103,11 @@ export class Browser {
   private cookie = '';
 
   constructor(private readonly app: FastifyInstance) {}
+
+  /** The session cookie, for requests made over real HTTP instead of inject. */
+  get cookieHeader(): string {
+    return this.cookie;
+  }
 
   async request(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
@@ -89,4 +132,19 @@ export class Browser {
   async login(email: string, password: string) {
     return this.request('POST', '/api/auth/login', { email, password });
   }
+}
+
+/** Polls until the check passes; status changes in the gateway are asynchronous. */
+export async function eventually<T>(check: () => Promise<T> | T, timeoutMs = 5000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      return await check();
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  throw lastError;
 }

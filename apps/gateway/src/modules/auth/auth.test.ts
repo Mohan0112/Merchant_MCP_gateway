@@ -8,7 +8,7 @@ const clock = { now: new Date('2026-10-15T10:00:00Z') };
 
 beforeEach(async () => {
   clock.now = new Date('2026-10-15T10:00:00Z');
-  h = await createHarness(clock);
+  h = await createHarness({ clock });
   await bootstrapAdmin(h.ctx, ADMIN.email, ADMIN.password);
 });
 afterEach(async () => {

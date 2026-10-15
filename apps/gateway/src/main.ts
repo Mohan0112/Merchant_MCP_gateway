@@ -1,11 +1,35 @@
 import { createLogger } from '@urumi/logger';
 import { buildApp } from './app';
-import { loadConfig } from './config';
+import { createGatewayModules, shutdown } from './compose';
+import { loadConfig, mcpAllowedHosts, type Config } from './config';
 import type { GatewayContext } from './context';
 import { createDatabase, createPool, pingDatabase } from './db/client';
-import { registerAuthPlugin, registerAuthRoutes } from './modules/auth/routes';
+import { sdkClientFactory } from './mcp/upstream/sdk-client';
 import { bootstrapAdmin } from './modules/auth/users';
-import { registerKeyRoutes } from './modules/keys/routes';
+import { FallbackProvider, OpenAiCompatibleProvider, type LlmProvider } from './modules/chat/llm';
+import { seedUpstreams } from './modules/servers/seed';
+
+/** Groq first, Gemini as fallback; a provider without a key is skipped. */
+function createLlmProvider(config: Config): LlmProvider | null {
+  const providers: LlmProvider[] = [];
+  if (config.GROQ_API_KEY) {
+    providers.push(
+      new OpenAiCompatibleProvider('groq', config.GROQ_MODEL, {
+        baseURL: config.GROQ_BASE_URL,
+        apiKey: config.GROQ_API_KEY,
+      }),
+    );
+  }
+  if (config.GEMINI_API_KEY) {
+    providers.push(
+      new OpenAiCompatibleProvider('gemini', config.GEMINI_MODEL, {
+        baseURL: config.GEMINI_BASE_URL,
+        apiKey: config.GEMINI_API_KEY,
+      }),
+    );
+  }
+  return providers.length ? new FallbackProvider(providers) : null;
+}
 
 // Composition root: real implementations are wired here; tests wire fakes into the same factories.
 async function main() {
@@ -19,6 +43,7 @@ async function main() {
     logger,
     settings: {
       apiKeyPepper: config.API_KEY_PEPPER,
+      credentialKey: config.CREDENTIAL_KEY,
       cookieSecure: config.PUBLIC_BASE_URL.startsWith('https://'),
       publicBaseUrl: config.PUBLIC_BASE_URL,
     },
@@ -26,23 +51,29 @@ async function main() {
   };
 
   await bootstrapAdmin(ctx, config.BOOTSTRAP_ADMIN_EMAIL, config.BOOTSTRAP_ADMIN_PASSWORD);
+  await seedUpstreams(ctx, config.SEED_UPSTREAMS, process.env);
+
+  const provider = createLlmProvider(config);
+  logger.info({ llm: provider?.name ?? 'none' }, 'chat agent configured');
+  const modules = createGatewayModules(ctx, {
+    factory: sdkClientFactory,
+    provider,
+    allowedHosts: mcpAllowedHosts(config),
+    version: config.APP_VERSION,
+    mcpUrl: () => `http://127.0.0.1:${config.PORT}/mcp`,
+  });
 
   const app = await buildApp({
     logger,
     checkDatabase: () => pingDatabase(pool),
     version: { name: 'gateway', version: config.APP_VERSION, commit: config.GIT_SHA },
-    register: async (instance) => {
-      await registerAuthPlugin(instance, ctx);
-      registerAuthRoutes(instance, ctx);
-      registerKeyRoutes(instance, ctx);
-    },
+    register: modules.register,
   });
 
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.once(signal, () => {
       logger.info({ signal }, 'shutting down');
-      app
-        .close()
+      shutdown(app, modules, 10_000)
         .then(() => pool.end())
         .catch((error: unknown) => logger.error({ err: error }, 'error during shutdown'))
         .finally(() => process.exit(0));
@@ -50,6 +81,7 @@ async function main() {
   }
 
   await app.listen({ port: config.PORT, host: '0.0.0.0' });
+  await modules.start();
 }
 
 main().catch((error: unknown) => {

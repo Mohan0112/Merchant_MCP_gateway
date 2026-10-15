@@ -43,3 +43,21 @@ seccompProfile:
   valueFrom:
     secretKeyRef: { name: {{ .Values.secrets.db }}, key: password }
 {{- end -}}
+
+{{/* Environment variable that carries one seeded upstream's credential, e.g. SEED_CREDENTIAL_WOO. */}}
+{{- define "platform.seedCredentialEnv" -}}
+{{- printf "SEED_CREDENTIAL_%s" (. | upper | replace "-" "_") -}}
+{{- end -}}
+
+{{/* SEED_UPSTREAMS as JSON: each seed points at its credential's environment variable, never the value. */}}
+{{- define "platform.seedUpstreams" -}}
+{{- $seeds := list -}}
+{{- range .Values.gateway.seedUpstreams -}}
+{{- $seed := omit . "credentialSecret" -}}
+{{- if .credentialSecret -}}
+{{- $_ := set $seed "credentialEnv" (include "platform.seedCredentialEnv" .slug) -}}
+{{- end -}}
+{{- $seeds = append $seeds $seed -}}
+{{- end -}}
+{{- toJson $seeds -}}
+{{- end -}}

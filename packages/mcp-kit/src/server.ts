@@ -20,6 +20,27 @@ export interface McpHttpServerOptions {
   /** Readiness check for /readyz. Keep it local: never depend on another service's health. */
   readiness?: () => Promise<boolean> | boolean;
   logger?: Logger;
+  /** How long close() waits for in-flight MCP exchanges before closing anyway (default 5 s). */
+  closeGraceMs?: number;
+}
+
+/**
+ * Waits for `closing`, but at most `ms`. MCP SDK 2.3's handler.close() can wait forever on an
+ * exchange whose client gave up mid-call (seen after a client-side timeout); shutdown must not.
+ */
+export async function settleWithin(closing: Promise<unknown>, ms: number): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  const settled = await Promise.race([
+    closing.then(
+      () => true,
+      () => true,
+    ),
+    new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), ms);
+    }),
+  ]);
+  clearTimeout(timer);
+  return settled;
 }
 
 export interface McpHttpServer {
@@ -138,8 +159,14 @@ export function createMcpHttpServer(options: McpHttpServerOptions): McpHttpServe
       return app.listen({ port, host });
     },
     async close() {
-      await handler.close();
+      const graceMs = options.closeGraceMs ?? 5000;
+      // A torn-down exchange can leave its HTTP response open; cut what's left once the grace is up.
+      const force = setTimeout(() => app.server.closeAllConnections(), graceMs);
+      if (!(await settleWithin(handler.close(), graceMs))) {
+        logger.warn('in-flight MCP exchanges did not finish in time; closing anyway');
+      }
       await app.close();
+      clearTimeout(force);
     },
   };
 }

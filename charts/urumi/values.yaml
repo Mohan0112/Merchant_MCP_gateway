@@ -54,3 +54,26 @@ fx-mcp:
 # Gateway (REST API, aggregating MCP endpoint, chat module), its PostgreSQL, and later the dashboard.
 platform:
   enabled: true
+  gateway:
+    seedUpstreams:
+      - slug: woo
+        displayName: WooCommerce store
+        url: http://woo-mcp:8080/mcp
+        authType: bearer
+        credentialSecret: { name: woo-mcp-auth, key: token }
+        timeoutMs: 30000
+      - slug: fx
+        displayName: Currency rates
+        url: http://fx-mcp:8080/mcp
+        authType: header
+        authHeaderName: X-API-Key
+        credentialSecret: { name: fx-mcp-auth, key: api-key }
+        timeoutMs: 15000
+      # Third upstream, outside the cluster: GitHub's hosted MCP server (issues toolset). Seeded only
+      # when Secret github-mcp has a token; otherwise skipped and retried on the next start.
+      - slug: github
+        displayName: GitHub issues
+        url: https://api.githubcopilot.com/mcp/x/issues
+        authType: bearer
+        credentialSecret: { name: github-mcp, key: token }
+        timeoutMs: 30000

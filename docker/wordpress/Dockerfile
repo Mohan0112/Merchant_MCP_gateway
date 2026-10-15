@@ -9,6 +9,7 @@ ARG WPCLI_VERSION=2.12.0
 
 COPY mu-plugins/ /tmp/urumi/mu-plugins/
 COPY healthz.php /tmp/urumi/healthz.php
+COPY htaccess /tmp/urumi/htaccess
 COPY bootstrap.sh /usr/local/bin/urumi-bootstrap
 
 # One layer builds the whole document root, so nothing is stored twice:
@@ -31,6 +32,7 @@ RUN set -eux; \
     unzip -q /tmp/storefront.zip -d /var/www/html/wp-content/themes/; \
     cp -a /tmp/urumi/mu-plugins /var/www/html/wp-content/; \
     cp /tmp/urumi/healthz.php /var/www/html/healthz.php; \
+    cp /tmp/urumi/htaccess /var/www/html/.htaccess; \
     mkdir -p /var/www/html/wp-content/uploads; \
     chown -R www-data:www-data /var/www/html /var/run/apache2 /var/lock/apache2; \
     sed -i 's/^Listen 80$/Listen 8080/' /etc/apache2/ports.conf; \

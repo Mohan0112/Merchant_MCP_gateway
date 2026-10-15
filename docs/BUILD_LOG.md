@@ -20,7 +20,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 2 | Local Kubernetes platform | ✅ | k3d cluster, registry, Traefik timeouts, nip.io domains, NetworkPolicy proven |
 | 3 | Technical spikes | ✅ | Woo Basic Auth ✅, MCP SDK v2 gateway + Claude Code ✅, Groq/Gemini tool loop ✅ |
 | 4 | Store image and sub-chart | ✅ | WordPress 7.1.3 + WooCommerce 11.2.1 image (non-root, :8080), MariaDB 11.4.13, PVCs, Ingress, Secrets script |
-| 5 | Store bootstrap and checkout | ⏳ | |
+| 5 | Store bootstrap and checkout | ✅ | Idempotent bootstrap Job, wp-cron CronJob, COD checkout via Store API → order #14 visible in admin |
 | 6 | MCP server kit and sub-chart | ⏳ | |
 | 7 | WooCommerce MCP server | ⏳ | |
 | 8 | Additional upstreams (fx-mcp, GitHub) | ⏳ | |
@@ -92,7 +92,7 @@ helm -n urumi history urumi                        # release revisions
 Common problems:
 - **`ERR_PNPM_IGNORED_BUILDS`:** pnpm blocks dependency build scripts unless they're listed under `allowBuilds` in `pnpm-workspace.yaml`. Approve one with `pnpm approve-builds <package>`.
 - **"unmet peer typescript":** typescript-eslint needs TypeScript `<6.1`. Don't upgrade `typescript` to 7.x until typescript-eslint supports it.
-- **Tools not found right after installing them with winget:** open a new terminal. In VS Code, restart VS Code so new PATH entries are picked up.
+- **Tools not found right after installing them with winget:** open a new terminal. In VS Code, restart VS Code so new PATH entries are picked up. winget adds each package's own folder (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\<Package>\…`) to the user PATH, not a shared links folder, so an already-open Git Bash needs those folders added by hand.
 - **Slow installs:** the repo lives inside OneDrive. Pause OneDrive sync during big installs (risk R3).
 - **`http://*.127.0.0.1.nip.io` doesn't load:** check the cluster is running (`k3d cluster list`), that nothing else holds port 80 (`Get-NetTCPConnection -LocalPort 80 -State Listen`), and that nip.io resolves (`nslookup store.127.0.0.1.nip.io`). Offline fallback: see `docs/local-domains.md`.
 - **Pod stuck in `ImagePullBackOff` for a local image:** push to `localhost:5001/<name>:<tag>` and reference it as `urumi-registry:5000/<name>:<tag>` in the pod spec.
@@ -103,6 +103,51 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-15 · Task 5: Store bootstrap and checkout · ✅
+
+**What was done**
+- **`urumi-bootstrap`** (`docker/wordpress/bootstrap.sh`, baked into the image), idempotent: every step checks before it acts.
+  1. Waits for the DB through `healthz.php`, then installs WordPress core if it isn't installed.
+  2. Sets the title, timezone and pretty permalinks; activates WooCommerce and Storefront; runs `wp wc update`.
+  3. Applies store settings: INR, IN:KA, address.
+     - **Turns off "Coming soon" mode**, which new WooCommerce stores enable by default and which hides the shop.
+     - **Turns shipping off**, so cash-on-delivery checkout isn't blocked by missing shipping methods.
+     - Guest checkout, tracking and marketplace suggestions off; onboarding skipped; **cash on delivery enabled**.
+  4. Creates the shop, cart, checkout and my-account pages (`wp wc tool run install_pages`).
+  5. Creates `mcp-bot` (`shop_manager`) and **replaces** its REST key from Secret `store-woo-api` on every run (hashed with `wc_api_hash()`), so a rotated Secret takes effect.
+  6. Seeds 4 products by SKU (Mug ₹499, T-Shirt ₹899, Notebook ₹249, Sticker Pack ₹99).
+  - `urumi-bootstrap cron` runs due WP-Cron events.
+- **WordPress `.htaccess` baked into the image.** Pretty permalinks need it, and a Job can't write into the web pod's immutable document root. It also passes the `Authorization` header to PHP for WooCommerce Basic Auth.
+- **Helm:**
+  - `store-bootstrap` Job as a `post-install,post-upgrade` hook with delete policy `before-hook-creation`, so the last run's logs stay available. `backoffLimit 3`, `activeDeadlineSeconds 600`.
+  - `wp-cron` CronJob every 5 minutes (`concurrencyPolicy: Forbid`).
+  - Store settings and the schedule are in values.
+- **Taskfile:** `deploy:local` now restarts Deployments after `helm upgrade`, so pods pick up freshly pushed `:dev` images. New `store:bootstrap-logs`.
+- `docs/runbooks/dod-manual.md`: the browser checklist for the store.
+
+**Verification**
+- First run: Job `Complete` in **52 s**. Log: installed, activated, settings applied, pages ensured, `mcp-bot` created, REST key in place, 4 products created.
+- **Idempotency:** a second `helm upgrade` (revision 4) re-ran the Job, which logged "already installed" and created nothing new: still 4 products, no new user.
+- **Storefront:** `GET /` → 200; `/shop/` lists all 4 products; `GET /wp-login.php` → 200.
+- **Cash-on-delivery checkout through the public URL** (WooCommerce Store API, the same calls the checkout page makes):
+  - `GET /cart` returned a Cart-Token; `add-item` for the Mug gave `items_count 1`, `total_price 49900` (paise).
+  - `POST /checkout` with `payment_method: cod` returned **`order_id 14`, `status processing`**.
+- **Order visible to the admin:** `wp wc shop_order list` → `14, processing, 499.00, "Cash on delivery", billing Asha Rao`.
+- **mcp-bot REST access in the real cluster** (ADR-0002), from a throwaway pod with the key from the Secret:
+  - Internal host → `GET /wc/v3/orders` **200**.
+  - **Same key with the public `Host` → 401**.
+  - Order 14 reads back as `processing`.
+- **wp-cron:** a manual run of the CronJob executed `action_scheduler_run_queue` and three other due events.
+
+**Problems and fixes**
+1. **Three WooCommerce defaults would have broken the brief's checkout test.** They were found while designing the bootstrap and handled in it: "Coming soon" mode, no shipping methods (checkout blocked), and missing `.htaccess` (pretty permalinks 404).
+2. **`helm: command not found` in Git Bash.** winget adds each package folder to the user PATH, which an already-open shell doesn't see. Added the folders explicitly; the troubleshooting note above is updated.
+3. **`/usr/sbin/sendmail: not found`** in the first bootstrap log: WordPress tried to send a notification email. Harmless; the cluster has no mail server and invites work by link (out of scope).
+
+**Follow-ups**
+- The owner runs the browser half of the Store DoD (`docs/runbooks/dod-manual.md`) whenever convenient.
+- `scripts/dod-check.mjs` (Task 18) will reuse the Store API checkout calls above.
 
 ### 2026-10-15 · Task 4: Store image and sub-chart · ✅
 

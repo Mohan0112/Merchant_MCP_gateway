@@ -1,4 +1,5 @@
 *
 !mu-plugins/
 !healthz.php
+!htaccess
 !bootstrap.sh

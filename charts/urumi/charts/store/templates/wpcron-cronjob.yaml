@@ -1,0 +1,39 @@
+# WP-Cron runs here instead of on page loads (DISABLE_WP_CRON). WooCommerce's Action Scheduler
+# rides on it, so scheduled store tasks keep running even with no site traffic.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wp-cron
+  labels:
+    {{- include "store.labels" (list . "wp-cron") | nindent 4 }}
+spec:
+  schedule: {{ .Values.cron.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 240
+      template:
+        metadata:
+          labels:
+            {{- include "store.labels" (list . "wp-cron") | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+          containers:
+            - name: wp-cron
+              image: "{{ .Values.wordpress.image.repository }}:{{ .Values.wordpress.image.tag }}"
+              imagePullPolicy: {{ .Values.wordpress.image.pullPolicy }}
+              command: [urumi-bootstrap, cron]
+              env:
+                {{- include "store.wordpressEnv" . | nindent 16 }}
+              resources:
+                requests: { cpu: 50m, memory: 96Mi }
+                limits: { cpu: 500m, memory: 256Mi }
+              securityContext:
+                {{- include "store.containerSecurityContext" . | nindent 16 }}

@@ -34,6 +34,35 @@ seccompProfile:
   type: RuntimeDefault
 {{- end -}}
 
+{{/* Extra environment for the bootstrap Job: admin login, REST key and store settings. */}}
+{{- define "store.bootstrapEnv" -}}
+{{- range $env, $key := dict "WP_ADMIN_USER" "admin-user" "WP_ADMIN_EMAIL" "admin-email" "WP_ADMIN_PASSWORD" "admin-password" }}
+- name: {{ $env }}
+  valueFrom:
+    secretKeyRef: { name: {{ $.Values.secrets.wordpress }}, key: {{ $key }} }
+{{- end }}
+- name: WOO_CONSUMER_KEY
+  valueFrom:
+    secretKeyRef: { name: {{ .Values.secrets.wooApi }}, key: consumer-key }
+- name: WOO_CONSUMER_SECRET
+  valueFrom:
+    secretKeyRef: { name: {{ .Values.secrets.wooApi }}, key: consumer-secret }
+- name: STORE_NAME
+  value: {{ .Values.settings.name | quote }}
+- name: STORE_CURRENCY
+  value: {{ .Values.settings.currency | quote }}
+- name: STORE_TIMEZONE
+  value: {{ .Values.settings.timezone | quote }}
+- name: STORE_COUNTRY
+  value: {{ .Values.settings.country | quote }}
+- name: STORE_CITY
+  value: {{ .Values.settings.city | quote }}
+- name: STORE_ADDRESS
+  value: {{ .Values.settings.address | quote }}
+- name: STORE_POSTCODE
+  value: {{ .Values.settings.postcode | quote }}
+{{- end -}}
+
 {{/* WordPress database and salt environment, shared by the web pod and WP-CLI jobs. */}}
 {{- define "store.wordpressEnv" -}}
 - name: WORDPRESS_DB_HOST

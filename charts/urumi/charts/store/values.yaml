@@ -31,6 +31,20 @@ mariadb:
     size: 2Gi
     storageClass: ''
 
+# Store settings applied by the bootstrap Job on every install/upgrade.
+settings:
+  name: Urumi Store
+  currency: INR
+  timezone: Asia/Kolkata
+  country: 'IN:KA'
+  city: Bengaluru
+  address: 1 MG Road
+  postcode: '560001'
+
+cron:
+  # How often due WP-Cron events run (WooCommerce scheduled actions ride on this).
+  schedule: '*/5 * * * *'
+
 # Secrets are created outside the chart by scripts/secrets.mjs (ADR-008); only names live here.
 secrets:
   # keys: root-password, password
@@ -38,6 +52,8 @@ secrets:
   # keys: auth-key, secure-auth-key, logged-in-key, nonce-key, auth-salt, secure-auth-salt,
   #       logged-in-salt, nonce-salt, admin-user, admin-email, admin-password
   wordpress: store-wp
+  # keys: consumer-key, consumer-secret (REST key for the mcp-bot user, ADR-0002)
+  wooApi: store-woo-api
 
 ingress:
   enabled: true

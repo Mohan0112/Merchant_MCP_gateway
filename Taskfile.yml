@@ -107,6 +107,15 @@ tasks:
         --namespace {{.NAMESPACE}} --create-namespace
         -f {{.CHART}}/values-local.yaml
         --wait --timeout 10m
+      # Local images are always tagged "dev", so Helm sees no change; restart Deployments so they
+      # pull the freshly pushed images. (Production uses immutable git-SHA tags instead.)
+      - kubectl -n {{.NAMESPACE}} rollout restart deployment
+      - for d in $(kubectl -n {{.NAMESPACE}} get deployment -o name); do kubectl -n {{.NAMESPACE}} rollout status "$d" --timeout=300s; done
+
+  store:bootstrap-logs:
+    desc: Show the logs of the last store bootstrap Job
+    cmds:
+      - kubectl -n {{.NAMESPACE}} logs job/store-bootstrap --tail=100
 
   store:wipe:
     desc: Delete the store's persistent data (database and uploads). Destructive.

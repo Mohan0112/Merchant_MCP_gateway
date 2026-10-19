@@ -1,0 +1,39 @@
+name: release
+
+# A version tag (vX.Y.Z) packages the umbrella chart at that version and publishes it as a GitHub
+# release asset. GitHub generates the notes from the pull requests and commits since the last tag.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: package chart and create release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+      - name: Package the chart
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          helm package charts/urumi --version "$version" --app-version "$version" --destination dist
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # A SemVer pre-release such as v1.2.0-rc.1 never becomes the "Latest" release.
+          prerelease=false
+          if [[ "$version" == *-* ]]; then prerelease=true; fi
+          # The images workflow tags every image built from a main commit with that commit's SHA.
+          image_tag="$(git rev-parse HEAD)"
+          gh release create "$GITHUB_REF_NAME" "dist/urumi-$version.tgz" \
+            --verify-tag --generate-notes --prerelease="$prerelease" \
+            --notes "Images: \`ghcr.io/mohan0112/merchant_mcp_gateway/<image>:$image_tag\`"

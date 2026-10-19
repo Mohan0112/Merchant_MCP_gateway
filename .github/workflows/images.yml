@@ -1,0 +1,90 @@
+name: images
+
+# Builds the five images on every push to main and pushes them to GHCR, tagged with the full git
+# SHA (immutable; values-prod.yaml pins it) and "main" (moves to the latest build of main).
+# Pull requests build nothing here: ci.yml gates them.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# A newer push to the same ref cancels the run it supersedes.
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # GHCR repository names must be lowercase.
+  IMAGE_PREFIX: ghcr.io/mohan0112/merchant_mcp_gateway
+
+jobs:
+  image:
+    name: ${{ matrix.image }}
+    # Forks can't push to this namespace, so they skip the job instead of failing it.
+    if: github.repository == 'Mohan0112/Merchant_MCP_gateway'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # The same builds as the image tasks in Taskfile.yml.
+      matrix:
+        include:
+          - image: wordpress
+            context: docker/wordpress
+            file: docker/wordpress/Dockerfile
+          - image: woo-mcp
+            context: .
+            file: docker/node-app/Dockerfile
+            build-args: APP=woo-mcp
+          - image: fx-mcp
+            context: .
+            file: docker/node-app/Dockerfile
+            build-args: APP=fx-mcp
+          - image: gateway
+            context: .
+            file: docker/node-app/Dockerfile
+            build-args: APP=gateway
+          - image: dashboard
+            context: .
+            file: docker/dashboard/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}
+          tags: |
+            type=sha,format=long,prefix=
+            type=raw,value=main,enable={{is_default_branch}}
+          # The source label links each package to this repository.
+          labels: |
+            org.opencontainers.image.source=https://github.com/Mohan0112/Merchant_MCP_gateway
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ matrix.image }}
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          build-args: ${{ matrix.build-args }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # One cache scope per image. mode=min caches only the final image's layers, so a changed
+          # Node build stage reruns in full. "pnpm fetch" fills a BuildKit cache mount that the
+          # GitHub cache doesn't keep; with mode=max a fresh runner would reuse the cached fetch
+          # layer without running it, and "pnpm install --offline" would find an empty store.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.image }}

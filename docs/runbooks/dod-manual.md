@@ -1,23 +1,62 @@
 # Definition of Done: manual browser checklist
 
-The automated check (`task dod`, Task 18) covers everything that doesn't need a browser. These steps are the browser half. Run them before recording the demo. Sections are added as each task lands.
+`task dod` checks the brief's whole definition of done through the APIs. This checklist is the same flow by hand, in a browser and a real MCP client, with two users. Run it before recording the demo; [../demo-script.md](../demo-script.md) is the recording version of it.
 
-Get the logins first:
+## Before you start
 
 ```sh
-task logins
+task demo:reset     # no orders, the 4 sample products, all servers connected, users A and B, empty audit log
+task logins         # wp-admin, your dashboard admin, and users A and B
 ```
 
-## Store (Tasks 4–5)
+Use three browser profiles (or one normal and two private windows): **Admin** (your account), **User A** and **User B**. Your admin account asks for a new password at its first sign-in.
 
-1. Open **http://store.127.0.0.1.nip.io/shop/**. You should see four products (Urumi Coffee Mug ₹499, T-Shirt ₹899, Notebook ₹249, Sticker Pack ₹99).
-2. Open **Urumi Coffee Mug** and click **Add to cart**, then **View cart**, then **Proceed to checkout**.
-3. Fill in the billing details (any name, address in India, email, phone). No shipping section appears, because shipping is turned off on purpose.
-4. Choose **Cash on delivery** and click **Place order**. You land on "Order received" with an order number.
-5. Open **http://store.127.0.0.1.nip.io/wp-admin/** and log in with the wp-admin user and password from `task logins`.
-6. Go to **WooCommerce → Orders**. The new order is listed as **Processing** with payment method **Cash on delivery**.
+## Store
 
-**If something is off**
-- No products: `task store:bootstrap-logs` shows what the bootstrap did.
-- "Coming soon" page instead of the shop: the bootstrap sets `woocommerce_coming_soon=no`. Re-run it with `task deploy:local`.
-- Checkout says no shipping options: the bootstrap sets `woocommerce_ship_to_countries=disabled`. Check the bootstrap logs.
+1. Open **http://store.127.0.0.1.nip.io/shop/**: four products (Urumi Coffee Mug ₹499, T-Shirt ₹899, Notebook ₹249, Sticker Pack ₹99).
+2. Open **Urumi Coffee Mug** → **Add to cart** → **View cart** → **Proceed to checkout**.
+3. Fill in the billing details (any name, an address in India, email, phone). There's no shipping section: shipping is off on purpose.
+4. Choose **Cash on delivery** → **Place order**. You land on "Order received" with an order number.
+5. **http://store.127.0.0.1.nip.io/wp-admin/** with the wp-admin login → **WooCommerce → Orders**: the order is **Processing**, paid by **Cash on delivery**.
+
+## Admin view
+
+1. Sign in at **http://app.127.0.0.1.nip.io** as Admin. **Servers** shows **woo** (WooCommerce store, 7 tools), **fx** (4) and **github** (10), all **Connected**. Click **woo** to see its tools.
+2. **Members** lists User A and User B as members.
+
+## Chat agent, as User A
+
+1. Sign in as User A → **Chat**.
+2. Ask: `Create a product named "Urumi Water Bottle" with a price of 349.` A card for `woo__create_product` appears, with its arguments and result; the answer confirms the product.
+3. Reload **http://store.127.0.0.1.nip.io/shop/**: the Water Bottle is listed. Order it by hand (as in Store, steps 2–4).
+4. Back in the chat: `What orders came in today?` The agent calls `woo__list_orders` and lists the order you just placed.
+
+## External MCP client, as User B
+
+1. Sign in as User B → **API keys** → **New key** → name `Claude Code` → **Create key**. Copy the key; it's shown once. The dialog has ready-made settings per client.
+2. In a terminal:
+   ```sh
+   claude mcp add --transport http urumi http://app.127.0.0.1.nip.io/mcp --header "Authorization: Bearer <B's key>"
+   claude                       # then: /mcp  → urumi connected, 21 tools
+   ```
+   (Or MCP Inspector: `npx @modelcontextprotocol/inspector`, Streamable HTTP, URL `http://app.127.0.0.1.nip.io/mcp`, header `Authorization: Bearer <key>`, **List Tools**.)
+3. Ask Claude Code: `What orders came in today?`: it uses `woo__list_orders` and finds both orders.
+4. Ask: `What is the total of today's orders in US dollars?`: it uses `woo__list_orders` and `fx__convert_currency`, two upstream servers in one prompt.
+
+## Team and control
+
+1. **Revoke:** as User B (or Admin → **Members** → User B → **API keys**), **Revoke** the key. The next Claude Code request fails with 401 `invalid_token`.
+2. **Disable:** as Admin, switch **fx** off on its card. Its tools disappear: User A asks `Convert 100 USD to INR` and the agent has no fx tool; a client with a valid key no longer lists `fx__…` (Claude Code updates via `list_changed`; in Inspector click **List Tools**). Switch it back on.
+3. **Kill:** stop the fx server and keep it down:
+   ```sh
+   kubectl -n urumi scale deployment fx-mcp --replicas=0
+   ```
+   Within about 20 s the **fx** card shows **Unreachable · Connection refused**, and `woo__…` tools keep working (ask the orders question again). Bring it back with `--replicas=1`; it reconnects by itself. (Deleting the pod instead works too, but the Deployment replaces it within seconds.)
+4. **Audit log:** as Admin, **Audit log** lists every call above: User A's with **Via** `chat_agent`, User B's with `mcp_client`, including the rejected call after revocation (`denied_auth`), the call to the disabled server (`rejected_disabled`) and to the dead one (`upstream_unreachable` or `timeout`). As User B, the audit log shows only B's own calls.
+
+## If something is off
+
+- No products, or a "Coming soon" page: `task store:bootstrap-logs`; `task deploy:local` runs the bootstrap again.
+- Checkout says there are no shipping options: the bootstrap sets `woocommerce_ship_to_countries=disabled`; check its logs.
+- A server stays Unreachable: [upstream-unreachable.md](upstream-unreachable.md).
+- The chat says the LLM is rate-limited: wait a minute, or set `GEMINI_API_KEY` too (the fallback), then `task secrets` and `task deploy:local`.

@@ -35,7 +35,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 17 | Kubernetes production readiness | ✅ | Default-deny ingress + 7 allow policies (14/14 live connection tests), `task verify:k8s` in CI, NOTES fixed |
 | 18 | Definition-of-Done check and CI/CD | ✅ | `task dod` 19/19; CI pushes five public images to GHCR per commit; chart release on tags; `task demo:reset` |
 | 19 | Production rehearsal (no VPS) | ✅ | Prod values + GHCR images on a fresh single-node k3s over HTTPS: DoD 19/19; upgrade, rollback and auto-rollback drill; VPS runbook |
-| 20 | Documentation | ⏳ | |
+| 20 | Documentation | ✅ | README, system design, threat model, demo script, 7 runbooks, walkthroughs M3–M4; every claim checked against the code, 110 links resolve |
 | 21 | Demo video | ⏳ | Owner records |
 | 22–30 | Phase 2 extras | ⏳ | Start after Task 18 passes |
 | 31 | Live VPS deployment | ⏸️ | Deferred by the owner |
@@ -116,6 +116,49 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-19 · Task 20: Documentation · ✅
+
+**What was done**
+- **`README.md`**, rewritten for reviewers and developers:
+  - a "for reviewers" map from the brief's deliverables to where each one lives
+  - an architecture diagram, a quick tour with screenshots, prerequisites
+  - local setup from a fresh clone, then: placing an order, keys, connecting Claude Code, Cursor, VS Code or Inspector, the chat agent, the audit log, managing servers, team and control
+  - production and VPS setup, with the rehearsal results
+  - upgrades, the definition of done, security in brief
+  - the three design questions the brief asks to document, troubleshooting, an honest "extras and stand-out items" table, and a docs index
+- **`docs/system-design.md`**:
+  - architecture and what's public versus internal
+  - key choices with rejected alternatives
+  - how woo-mcp talks to the store and why
+  - aggregation, naming and collisions, routing (with a sequence diagram)
+  - failure handling (timeouts, states, reasons, what callers see)
+  - identity, access and audit; the data model; Kubernetes (workloads, NetworkPolicies, Secrets, local domains)
+  - local versus production, and trade-offs
+- **`docs/threat-model.md`:**
+  - the brief's four questions
+  - a malicious upstream
+  - member versus admin capabilities
+  - how each secret is stored
+  - other controls, STRIDE, and known gaps with their Phase 2 tasks
+- **`docs/demo-script.md`:** an 18-minute recording plan covering every item of the brief's "Demo video requirements", with preparation, exact clicks and commands, and talking points.
+- **Runbooks:**
+  - `dod-manual.md`, extended from the store steps to the whole two-user flow
+  - three new ones: `revoke-compromised-key.md`, `rotate-upstream-credential.md`, `upstream-unreachable.md`
+  - `vps.md` and `upgrade-and-rollback.md` came with Task 19
+- **Walkthrough notes** `M3-gateway.md` and `M4-dashboard-chat.md`, for the Round 2 interview: file maps, flows traced through the code, decisions, likely questions.
+
+**Verification**
+- Every concrete claim was checked against the code: timeouts and thresholds, key and token formats, limits, column names, UI labels, the CSP, test names, Secret keys. Corrections made:
+  - the audit table's time column is `occurred_at`
+  - the edit dialog's button is "Save changes"
+  - `woo__list_orders` returns only the customer's name; `get_order` returns billing details
+  - after today's changes, the gateway's memory request is 192Mi and no pod mounts a service-account token
+- The demo's database queries were run against the live cluster.
+- A link check over `README.md` and `docs/`: 110 relative links, none broken.
+
+**Not done**
+- The README's local setup wasn't replayed from a fresh clone on an empty dev cluster. The production rehearsal did install from scratch (Secrets, chart, bootstrap, DoD), but with GHCR images rather than `task images:build`.
 
 ### 2026-10-19 · Task 19: Production values and the production rehearsal · ✅
 

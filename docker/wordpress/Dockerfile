@@ -10,7 +10,6 @@ ARG WPCLI_VERSION=2.12.0
 COPY mu-plugins/ /tmp/urumi/mu-plugins/
 COPY healthz.php /tmp/urumi/healthz.php
 COPY htaccess /tmp/urumi/htaccess
-COPY bootstrap.sh /usr/local/bin/urumi-bootstrap
 
 # One layer builds the whole document root, so nothing is stored twice:
 # - WordPress core is copied from the image's source tree. The official entrypoint skips its own
@@ -24,7 +23,7 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends unzip; \
     curl -fsSL -o /usr/local/bin/wp \
       "https://github.com/wp-cli/wp-cli/releases/download/v${WPCLI_VERSION}/wp-cli-${WPCLI_VERSION}.phar"; \
-    chmod +x /usr/local/bin/wp /usr/local/bin/urumi-bootstrap; \
+    chmod +x /usr/local/bin/wp; \
     cp -a /usr/src/wordpress/. /var/www/html/; \
     curl -fsSL -o /tmp/woocommerce.zip "https://downloads.wordpress.org/plugin/woocommerce.${WOOCOMMERCE_VERSION}.zip"; \
     unzip -q /tmp/woocommerce.zip -d /var/www/html/wp-content/plugins/; \
@@ -40,6 +39,13 @@ RUN set -eux; \
     rm -rf /tmp/woocommerce.zip /tmp/storefront.zip /tmp/urumi; \
     apt-get purge -y --auto-remove unzip; \
     rm -rf /var/lib/apt/lists/*
+
+# Small, often-changed layers last, so editing them doesn't re-run the downloads above:
+# the Ahjin child theme, the catalogue the bootstrap seeds (products.json, photos, seed.php)
+# and the bootstrap script itself.
+COPY --chown=33:33 theme/ahjin/ /var/www/html/wp-content/themes/ahjin/
+COPY catalog/ /usr/local/share/ahjin/catalog/
+COPY --chmod=755 bootstrap.sh /usr/local/bin/urumi-bootstrap
 
 USER 33:33
 EXPOSE 8080

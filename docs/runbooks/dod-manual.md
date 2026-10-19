@@ -5,7 +5,7 @@
 ## Before you start
 
 ```sh
-task demo:reset     # no orders, the 4 sample products, all servers connected, users A and B, empty audit log
+task demo:reset     # no orders, the 19-laptop catalogue, all servers connected, users A and B, empty audit log
 task logins         # wp-admin, your dashboard admin, and users A and B
 ```
 
@@ -13,8 +13,8 @@ Use three browser profiles (or one normal and two private windows): **Admin** (y
 
 ## Store
 
-1. Open **http://store.127.0.0.1.nip.io/shop/**: four products (Urumi Coffee Mug ₹499, T-Shirt ₹899, Notebook ₹249, Sticker Pack ₹99).
-2. Open **Urumi Coffee Mug** → **Add to cart** → **View cart** → **Proceed to checkout**.
+1. Open **http://store.127.0.0.1.nip.io/shop/**: 19 laptops in six categories, with photos, specifications, sale prices and stock.
+2. Open **Dell XPS 13** → **Add to cart** → **View cart** → **Proceed to checkout**.
 3. Fill in the billing details (any name, an address in India, email, phone). There's no shipping section: shipping is off on purpose.
 4. Choose **Cash on delivery** → **Place order**. You land on "Order received" with an order number.
 5. **http://store.127.0.0.1.nip.io/wp-admin/** with the wp-admin login → **WooCommerce → Orders**: the order is **Processing**, paid by **Cash on delivery**.
@@ -27,8 +27,8 @@ Use three browser profiles (or one normal and two private windows): **Admin** (y
 ## Chat agent, as User A
 
 1. Sign in as User A → **Chat**.
-2. Ask: `Create a product named "Urumi Water Bottle" with a price of 349.` A card for `woo__create_product` appears, with its arguments and result; the answer confirms the product.
-3. Reload **http://store.127.0.0.1.nip.io/shop/**: the Water Bottle is listed. Order it by hand (as in Store, steps 2–4).
+2. Ask: `Create a product named "Ahjin Laptop Sleeve 14" with a price of 1499.` A card for `woo__create_product` appears, with its arguments and result; the answer confirms the product.
+3. Reload **http://store.127.0.0.1.nip.io/shop/**: the sleeve is listed. Order it by hand (as in Store, steps 2–4).
 4. Back in the chat: `What orders came in today?` The agent calls `woo__list_orders` and lists the order you just placed.
 
 ## External MCP client, as User B

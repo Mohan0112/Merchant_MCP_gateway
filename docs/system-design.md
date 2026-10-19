@@ -12,7 +12,7 @@ Everything runs in one namespace, `urumi`, installed as one Helm release. Every 
 |---|---|---|---|
 | `wordpress` | Deployment | Storefront, cash-on-delivery checkout, wp-admin. WooCommerce is the system of record for products and orders | `docker/wordpress`, `charts/urumi/charts/store` |
 | `mariadb` | StatefulSet | Store database | `charts/urumi/charts/store` |
-| `store-bootstrap`, `wp-cron` | Job (Helm hook), CronJob | Idempotent store setup (WooCommerce, COD, `mcp-bot` user and REST key, sample products); scheduled WordPress tasks | `docker/wordpress/bootstrap.sh` |
+| `store-bootstrap`, `wp-cron` | Job (Helm hook), CronJob | Idempotent store setup (WooCommerce, COD, `mcp-bot` user and REST key, the laptop catalogue with photos, the Ahjin theme); scheduled WordPress tasks | `docker/wordpress/bootstrap.sh` |
 | `woo-mcp` | Deployment | Our WooCommerce MCP server: 6 tools plus `server_info` | `apps/woo-mcp` |
 | `fx-mcp` | Deployment | Our currency MCP server: 3 tools plus `server_info`; live rates with a built-in fallback table | `apps/fx-mcp` |
 | GitHub MCP | Outside the cluster, HTTPS | Third upstream: GitHub's hosted server, issues toolset (10 tools), bearer credential | registered in the gateway |

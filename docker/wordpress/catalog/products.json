@@ -1,0 +1,454 @@
+{
+  "categories": [
+    {
+      "slug": "gaming",
+      "name": "Gaming",
+      "description": "High-refresh screens and RTX graphics for serious play.",
+      "image": "alienware-m16-r2.jpg"
+    },
+    {
+      "slug": "ultrabooks",
+      "name": "Ultrabooks",
+      "description": "Thin, light and all-day battery life.",
+      "image": "macbook-air-13.jpg"
+    },
+    {
+      "slug": "creators",
+      "name": "Creators",
+      "description": "Colour-accurate screens and the power for editing, 3D and code.",
+      "image": "macbook-pro-14.jpg"
+    },
+    {
+      "slug": "business",
+      "name": "Business",
+      "description": "Secure, durable and built for the office.",
+      "image": "dell-latitude-7450.jpg"
+    },
+    {
+      "slug": "2-in-1",
+      "name": "2-in-1",
+      "description": "Laptop, tablet and everything in between.",
+      "image": "hp-spectre-x360-14.jpg"
+    },
+    {
+      "slug": "everyday",
+      "name": "Everyday",
+      "description": "Great value for study, home and work.",
+      "image": "dell-inspiron-14-plus.jpg"
+    }
+  ],
+  "products": [
+    {
+      "sku": "APL-MBA13-M4",
+      "name": "Apple MacBook Air 13\" (M4)",
+      "brand": "Apple",
+      "category": "ultrabooks",
+      "regular": "99900",
+      "sale": "94900",
+      "stock": 18,
+      "featured": true,
+      "images": ["macbook-air-13.jpg", "macbook-air-13-2.jpg", "macbook-air-13-3.jpg"],
+      "short": "The thin-and-light favourite: silent, fanless and good for a full day of work on one charge.",
+      "description": "<p>The MacBook Air with the M4 chip is fast enough for photo edits, dozens of browser tabs and video calls at once, and it never makes a sound because it has no fan. The 13.6-inch Liquid Retina display is bright and sharp, and the 1080p camera keeps you looking good in meetings.</p><p>In the box: MacBook Air, 30W USB-C power adapter and USB-C to MagSafe 3 cable.</p>",
+      "specs": {
+        "Processor": "Apple M4, 10-core CPU",
+        "Graphics": "8-core GPU",
+        "Memory": "16 GB unified memory",
+        "Storage": "256 GB SSD",
+        "Display": "13.6\" Liquid Retina, 2560 × 1664",
+        "Battery": "Up to 18 hours",
+        "Weight": "1.24 kg",
+        "Operating system": "macOS"
+      }
+    },
+    {
+      "sku": "APL-MBP14-M4P",
+      "name": "Apple MacBook Pro 14\" (M4 Pro)",
+      "brand": "Apple",
+      "category": "creators",
+      "regular": "199900",
+      "stock": 9,
+      "featured": true,
+      "images": ["macbook-pro-14.jpg", "macbook-pro-14-2.jpg"],
+      "short": "Pro performance in a portable size, with a mini-LED XDR display that is made for colour work.",
+      "description": "<p>The M4 Pro chip compiles code, exports 4K timelines and renders 3D scenes without slowing down, and it stays cool and quiet while doing it. The Liquid Retina XDR display reaches 1600 nits for HDR and refreshes at up to 120 Hz.</p><p>Ports: three Thunderbolt 5, HDMI, SDXC card slot, MagSafe 3 and a headphone jack.</p>",
+      "specs": {
+        "Processor": "Apple M4 Pro, 12-core CPU",
+        "Graphics": "16-core GPU",
+        "Memory": "24 GB unified memory",
+        "Storage": "512 GB SSD",
+        "Display": "14.2\" Liquid Retina XDR, 3024 × 1964, 120 Hz",
+        "Battery": "Up to 22 hours",
+        "Weight": "1.60 kg",
+        "Operating system": "macOS"
+      }
+    },
+    {
+      "sku": "APL-MBP16-M4M",
+      "name": "Apple MacBook Pro 16\" (M4 Max)",
+      "brand": "Apple",
+      "category": "creators",
+      "regular": "349900",
+      "stock": 4,
+      "images": ["macbook-pro-16.jpg", "macbook-pro-16-2.jpg"],
+      "short": "The most powerful MacBook: a desktop-class workstation for film, music and machine learning.",
+      "description": "<p>With the M4 Max and 36 GB of unified memory, this MacBook Pro handles 8K video, large language models and orchestral sessions on battery power. The 16.2-inch XDR display gives you room for timelines and tool panels side by side.</p>",
+      "specs": {
+        "Processor": "Apple M4 Max, 14-core CPU",
+        "Graphics": "32-core GPU",
+        "Memory": "36 GB unified memory",
+        "Storage": "1 TB SSD",
+        "Display": "16.2\" Liquid Retina XDR, 3456 × 2234, 120 Hz",
+        "Battery": "Up to 21 hours",
+        "Weight": "2.14 kg",
+        "Operating system": "macOS"
+      }
+    },
+    {
+      "sku": "DEL-XPS13",
+      "name": "Dell XPS 13",
+      "brand": "Dell",
+      "category": "ultrabooks",
+      "regular": "139990",
+      "sale": "129990",
+      "stock": 12,
+      "images": ["dell-xps-13.jpg", "dell-xps-13-2.jpg"],
+      "short": "A precision-machined ultrabook with an edge-to-edge keyboard and a battery that lasts the day.",
+      "description": "<p>Intel's Core Ultra 7 processor with a built-in AI engine keeps the XPS 13 fast and efficient. The 13.4-inch display has slim borders on all four sides, so the whole laptop is barely bigger than an A4 sheet.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 7 258V",
+        "Graphics": "Intel Arc 140V",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "13.4\" FHD+, 120 Hz",
+        "Battery": "Up to 20 hours",
+        "Weight": "1.19 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "DEL-XPS14",
+      "name": "Dell XPS 14",
+      "brand": "Dell",
+      "category": "creators",
+      "regular": "189990",
+      "stock": 7,
+      "featured": true,
+      "images": ["dell-xps-14.jpg", "dell-xps-14-2.jpg"],
+      "short": "A 3.2K OLED touch screen and RTX graphics in a 14-inch aluminium body.",
+      "description": "<p>The XPS 14 pairs an Intel Core Ultra 7 with an NVIDIA GeForce RTX 4050, so Lightroom, Premiere and Blender run comfortably. The OLED touch screen covers the full DCI-P3 colour space.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 7 155H",
+        "Graphics": "NVIDIA GeForce RTX 4050, 6 GB",
+        "Memory": "32 GB LPDDR5x",
+        "Storage": "1 TB SSD",
+        "Display": "14.5\" 3.2K OLED touch",
+        "Battery": "Up to 13 hours",
+        "Weight": "1.79 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "DEL-LAT7450",
+      "name": "Dell Latitude 7450",
+      "brand": "Dell",
+      "category": "business",
+      "regular": "124500",
+      "stock": 20,
+      "images": ["dell-latitude-7450.jpg", "dell-latitude-7450-2.jpg"],
+      "short": "A business laptop with vPro management, a privacy shutter and a keyboard made for long days.",
+      "description": "<p>Latitude 7450 is built for IT teams: Intel vPro for remote management, a fingerprint reader, a camera privacy shutter and three years of ProSupport options. A 1.36 kg aluminium chassis survives the daily commute.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 7 165U vPro",
+        "Graphics": "Intel Graphics",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "14\" FHD+ anti-glare",
+        "Battery": "Up to 16 hours",
+        "Weight": "1.36 kg",
+        "Operating system": "Windows 11 Pro"
+      }
+    },
+    {
+      "sku": "DEL-INS14P",
+      "name": "Dell Inspiron 14 Plus",
+      "brand": "Dell",
+      "category": "everyday",
+      "regular": "74990",
+      "sale": "69990",
+      "stock": 25,
+      "images": ["dell-inspiron-14-plus.jpg", "dell-inspiron-14-plus-2.jpg"],
+      "short": "A sharp 2.2K screen and a full day of battery at a sensible price.",
+      "description": "<p>For study, home and office work, the Inspiron 14 Plus has a 2.2K display, a comfortable backlit keyboard and enough ports that you will rarely need a dongle.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 5 125H",
+        "Graphics": "Intel Arc",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "14\" 2.2K, 60 Hz",
+        "Battery": "Up to 12 hours",
+        "Weight": "1.60 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "DEL-LAT7350D",
+      "name": "Dell Latitude 7350 Detachable",
+      "brand": "Dell",
+      "category": "2-in-1",
+      "regular": "134990",
+      "stock": 6,
+      "images": ["dell-latitude-7350-detachable.jpg", "dell-latitude-7350-detachable-2.jpg"],
+      "short": "A business tablet with a detachable keyboard and an active pen, for work on the move.",
+      "description": "<p>Take the keyboard off and the Latitude 7350 Detachable becomes a 0.85 kg tablet for signing documents, sketching or presenting. The 13-inch 2.8K touch display works with the included active pen.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 7 164U",
+        "Graphics": "Intel Graphics",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "13\" 2.8K touch, pen support",
+        "Battery": "Up to 10 hours",
+        "Weight": "0.85 kg (tablet)",
+        "Operating system": "Windows 11 Pro"
+      }
+    },
+    {
+      "sku": "AWR-M16R2",
+      "name": "Alienware m16 R2",
+      "brand": "Alienware",
+      "category": "gaming",
+      "regular": "199990",
+      "sale": "184990",
+      "stock": 8,
+      "featured": true,
+      "images": ["alienware-m16-r2.jpg", "alienware-m16-r2-2.jpg"],
+      "short": "RTX 4070 graphics and a 240 Hz QHD+ screen in Alienware's slimmest 16-inch design.",
+      "description": "<p>The m16 R2 runs the latest games at high settings with an Intel Core Ultra 9 and an NVIDIA GeForce RTX 4070. Its per-key AlienFX lighting, Cryo-tech cooling and 240 Hz panel keep every frame smooth.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 9 185H",
+        "Graphics": "NVIDIA GeForce RTX 4070, 8 GB",
+        "Memory": "32 GB DDR5",
+        "Storage": "1 TB SSD",
+        "Display": "16\" QHD+, 240 Hz",
+        "Battery": "Up to 7 hours",
+        "Weight": "2.61 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "AWR-X16R2",
+      "name": "Alienware x16 R2",
+      "brand": "Alienware",
+      "category": "gaming",
+      "regular": "279990",
+      "stock": 3,
+      "images": ["alienware-x16-r2.jpg", "alienware-x16-r2-2.jpg", "alienware-x16-r2-3.jpg"],
+      "short": "Flagship gaming in Lunar Silver: RTX 4080, 2 TB of storage and a 240 Hz display.",
+      "description": "<p>The x16 R2 is Alienware's thin flagship, with an RTX 4080, a magnesium-alloy chassis and a light ring that wraps around the rear vents. Ideal for gamers who want desktop performance in a laptop they can carry.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 9 185H",
+        "Graphics": "NVIDIA GeForce RTX 4080, 12 GB",
+        "Memory": "32 GB LPDDR5x",
+        "Storage": "2 TB SSD",
+        "Display": "16\" QHD+, 240 Hz",
+        "Battery": "Up to 8 hours",
+        "Weight": "2.72 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "ACR-PHN16",
+      "name": "Acer Predator Helios Neo 16",
+      "brand": "Acer",
+      "category": "gaming",
+      "regular": "129990",
+      "stock": 10,
+      "images": ["acer-predator-helios-neo-16.jpg"],
+      "short": "Strong RTX 4060 performance and a 240 Hz WQXGA screen for competitive play.",
+      "description": "<p>The Helios Neo 16 balances price and performance: a 20-core Intel Core i7 HX, RTX 4060 graphics and dual-fan cooling, with an easy upgrade path for memory and storage.</p>",
+      "specs": {
+        "Processor": "Intel Core i7-14700HX",
+        "Graphics": "NVIDIA GeForce RTX 4060, 8 GB",
+        "Memory": "16 GB DDR5",
+        "Storage": "1 TB SSD",
+        "Display": "16\" WQXGA, 240 Hz",
+        "Battery": "Up to 6 hours",
+        "Weight": "2.80 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "LEN-LOQ15",
+      "name": "Lenovo LOQ 15",
+      "brand": "Lenovo",
+      "category": "gaming",
+      "regular": "84990",
+      "sale": "79990",
+      "stock": 15,
+      "images": ["lenovo-loq-15.jpg"],
+      "short": "An affordable first gaming laptop with RTX 4050 graphics and a 144 Hz display.",
+      "description": "<p>LOQ 15 brings RTX graphics and DLSS to a student budget. A 144 Hz Full HD screen, a full-size keyboard with a number pad and Lenovo's AI-tuned cooling make it a solid all-rounder.</p>",
+      "specs": {
+        "Processor": "Intel Core i5-12450HX",
+        "Graphics": "NVIDIA GeForce RTX 4050, 6 GB",
+        "Memory": "16 GB DDR5",
+        "Storage": "512 GB SSD",
+        "Display": "15.6\" FHD, 144 Hz",
+        "Battery": "Up to 6 hours",
+        "Weight": "2.38 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "ASU-ZBDUO",
+      "name": "ASUS Zenbook Duo",
+      "brand": "ASUS",
+      "category": "creators",
+      "regular": "159990",
+      "stock": 5,
+      "images": ["asus-zenbook-duo.jpg"],
+      "short": "Two 14-inch 3K OLED touch screens: double the space for timelines, code and research.",
+      "description": "<p>The Zenbook Duo stacks two full OLED screens, with a detachable Bluetooth keyboard and a built-in kickstand. Use them as one tall canvas, side by side, or as a laptop with a second display below.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 9 185H",
+        "Graphics": "Intel Arc",
+        "Memory": "32 GB LPDDR5x",
+        "Storage": "1 TB SSD",
+        "Display": "Dual 14\" 3K OLED touch, 120 Hz",
+        "Battery": "Up to 13 hours",
+        "Weight": "1.65 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "MSF-SL7",
+      "name": "Microsoft Surface Laptop (7th Edition)",
+      "brand": "Microsoft",
+      "category": "ultrabooks",
+      "regular": "149999",
+      "sale": "139999",
+      "stock": 11,
+      "images": ["surface-laptop-7.jpg", "surface-laptop-7-2.jpg"],
+      "short": "A Copilot+ PC with Snapdragon X Elite, a 120 Hz touch screen and a very long battery life.",
+      "description": "<p>Surface Laptop runs Windows 11 on Snapdragon X Elite, so it wakes instantly, stays cool and lasts all day. The 13.8-inch PixelSense Flow touch display adapts its refresh rate to what you do.</p>",
+      "specs": {
+        "Processor": "Qualcomm Snapdragon X Elite",
+        "Graphics": "Qualcomm Adreno",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "13.8\" PixelSense Flow touch, 120 Hz",
+        "Battery": "Up to 20 hours",
+        "Weight": "1.34 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "MSF-SP11",
+      "name": "Microsoft Surface Pro 11",
+      "brand": "Microsoft",
+      "category": "2-in-1",
+      "regular": "124999",
+      "stock": 9,
+      "images": ["surface-pro-11.jpg", "surface-pro-11-2.jpg"],
+      "short": "The most flexible Surface: a 13-inch OLED tablet with a built-in kickstand.",
+      "description": "<p>Surface Pro 11 is a full Windows PC in a 0.9 kg tablet. Snap on a keyboard to type, fold it back to draw with a pen, or prop it up on the kickstand to watch. Keyboard and pen are sold separately.</p>",
+      "specs": {
+        "Processor": "Qualcomm Snapdragon X Plus",
+        "Graphics": "Qualcomm Adreno",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "13\" OLED touch, 120 Hz",
+        "Battery": "Up to 14 hours",
+        "Weight": "0.90 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "HP-SPX360-14",
+      "name": "HP Spectre x360 14",
+      "brand": "HP",
+      "category": "2-in-1",
+      "regular": "164999",
+      "stock": 6,
+      "featured": true,
+      "images": ["hp-spectre-x360-14.jpg", "hp-spectre-x360-14-2.jpg"],
+      "short": "A premium convertible with a 2.8K OLED touch screen, a 360° hinge and a pen in the box.",
+      "description": "<p>Spectre x360 folds from laptop to tent to tablet. The 2.8K OLED display shows deep blacks and rich colour, and the included rechargeable pen makes it a notebook and a sketchbook too.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 7 155H",
+        "Graphics": "Intel Arc",
+        "Memory": "32 GB LPDDR5x",
+        "Storage": "1 TB SSD",
+        "Display": "14\" 2.8K OLED touch, 120 Hz",
+        "Battery": "Up to 17 hours",
+        "Weight": "1.44 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "HP-PAVP14",
+      "name": "HP Pavilion Plus 14",
+      "brand": "HP",
+      "category": "everyday",
+      "regular": "62999",
+      "sale": "57999",
+      "stock": 22,
+      "images": ["hp-pavilion-plus-14.jpg"],
+      "short": "An OLED screen and an all-metal body at an everyday price.",
+      "description": "<p>Pavilion Plus 14 is light enough for college and capable enough for spreadsheets, streaming and light photo editing. Its 2.8K OLED display is rare at this price.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 5 125H",
+        "Graphics": "Intel Arc",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "14\" 2.8K OLED",
+        "Battery": "Up to 11 hours",
+        "Weight": "1.40 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    },
+    {
+      "sku": "LEN-X1C12",
+      "name": "Lenovo ThinkPad X1 Carbon Gen 12",
+      "brand": "Lenovo",
+      "category": "business",
+      "regular": "179990",
+      "stock": 7,
+      "featured": true,
+      "images": ["thinkpad-x1-carbon.jpg"],
+      "short": "The classic business ultrabook: 1.09 kg of carbon fibre with the best keyboard in its class.",
+      "description": "<p>ThinkPad X1 Carbon is tested against military standards for drops, heat and dust, and it still weighs barely a kilogram. Intel vPro, a fingerprint reader in the power button and a 2.8K OLED screen make it the executive's choice.</p>",
+      "specs": {
+        "Processor": "Intel Core Ultra 7 155U vPro",
+        "Graphics": "Intel Graphics",
+        "Memory": "32 GB LPDDR5x",
+        "Storage": "1 TB SSD",
+        "Display": "14\" 2.8K OLED",
+        "Battery": "Up to 15 hours",
+        "Weight": "1.09 kg",
+        "Operating system": "Windows 11 Pro"
+      }
+    },
+    {
+      "sku": "LEN-IPS5",
+      "name": "Lenovo IdeaPad Slim 5",
+      "brand": "Lenovo",
+      "category": "everyday",
+      "regular": "67990",
+      "stock": 19,
+      "images": ["ideapad-slim-5.jpg"],
+      "short": "Ryzen 7 power and a WUXGA OLED screen in a slim body for study and work.",
+      "description": "<p>IdeaPad Slim 5 is the dependable everyday laptop: fast AMD Ryzen 7 performance, a 1080p webcam with a privacy shutter and rapid charging that gives you three hours of use in fifteen minutes.</p>",
+      "specs": {
+        "Processor": "AMD Ryzen 7 8845HS",
+        "Graphics": "AMD Radeon 780M",
+        "Memory": "16 GB LPDDR5x",
+        "Storage": "512 GB SSD",
+        "Display": "14\" WUXGA OLED",
+        "Battery": "Up to 12 hours",
+        "Weight": "1.46 kg",
+        "Operating system": "Windows 11 Home"
+      }
+    }
+  ]
+}

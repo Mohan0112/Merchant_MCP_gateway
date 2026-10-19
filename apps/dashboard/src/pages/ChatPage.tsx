@@ -29,9 +29,9 @@ interface Turn {
 
 const SUGGESTIONS = [
   'What orders came in today?',
-  'Create a product named "Urumi Notebook" with a price of 249.',
+  'Create a product named "Ahjin Laptop Sleeve 14" with a price of 1499.',
   "What is today's order total in US dollars?",
-  'List the 5 newest products with their prices.',
+  'Which gaming laptops are in stock, and at what price?',
 ];
 
 /** Sends one chat turn and applies each server-sent event as it arrives. */

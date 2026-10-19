@@ -34,8 +34,18 @@ spec:
           env:
             {{- include "store.wordpressEnv" . | nindent 12 }}
             {{- include "store.bootstrapEnv" . | nindent 12 }}
+          # Product photos and WooCommerce's placeholder are written here, so they must land on the
+          # same volume the web pod serves. ReadWriteOnce allows it: the scheduler places this pod
+          # on the volume's node, next to WordPress.
+          volumeMounts:
+            - name: uploads
+              mountPath: /var/www/html/wp-content/uploads
           resources:
             requests: { cpu: 100m, memory: 128Mi }
             limits: { cpu: 1000m, memory: 512Mi }
           securityContext:
             {{- include "store.containerSecurityContext" . | nindent 12 }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: wp-uploads

@@ -117,6 +117,52 @@ Common problems:
 
 ## Log
 
+### 2026-10-19 · The store becomes Ahjin, a laptop shop · ✅
+
+**Why.** The owner asked for a professional-looking laptop store named **Ahjin** in place of the four-item merchandise demo, whose product images didn't render.
+
+**What was done**
+- **Catalogue** (`docker/wordpress/catalog/`):
+  - 19 laptops from Apple, Dell, Alienware, Lenovo, HP, ASUS, Acer and Microsoft, in six categories: Gaming, Ultrabooks, Creators, Business, 2-in-1, Everyday.
+  - Each has a specification table, an INR price (several on sale), a stock level and one to three photos.
+  - `products.json` holds the data; `seed.php` (run by the bootstrap through `wp eval-file`) creates categories with images, WooCommerce brands (built in since 9.6), and products, using WooCommerce's own product API.
+  - Seeding is idempotent: products are matched by SKU and created once, so an admin's later edits survive, and images are imported once.
+  - 34 photos (3.2 MB) and the hero image are from Unsplash under the Unsplash License, several from Dell's and Alienware's own accounts. `CREDITS.md` lists every source.
+- **Theme** (`docker/wordpress/theme/ahjin/`): a Storefront child theme. Its colours replace Storefront's defaults in code, so the design is versioned with the image instead of stored as Customizer settings in the database.
+  - Layout: an announcement bar, a dark header with search, a category menu, full-width pages with no sidebar.
+  - Home page: a hero, a row of store perks, category tiles, featured, deals and new arrivals rows, a brand strip, and a four-column footer.
+  - Product cards: equal-height grid cards with the brand, key specs, sale badge and whole-rupee prices.
+  - Product pages: a key-spec grid, delivery and payment notes, and a "Specifications" tab.
+  - Larger image sizes: 900 px product images, 600 px cards.
+- **Bootstrap:**
+  - activates the theme and sets landscape 4:3 card images before any import
+  - creates the home page (Storefront's homepage template) and the main menu, and removes WordPress's sample post and page
+  - creates any missing image sizes
+- **Chart:** the store name is now `Ahjin`. The **bootstrap Job and the wp-cron CronJob now mount the uploads volume** (problem 1).
+- **Elsewhere:**
+  - `demo:reset` keeps exactly the catalogue's SKUs, read from `products.json`.
+  - The dashboard's chat suggestions and the docs now use laptop examples.
+  - The woo-mcp test data no longer uses the old products.
+- **Faster store image rebuilds:** the theme, catalogue and bootstrap are now small layers after the WordPress and WooCommerce downloads.
+
+**Verification**
+- Screenshots with headless Edge at 1440 and 390 px (`docs/screenshots/20-24`): home, shop (19 results on two pages), category, product page, phone. No console errors or failed requests on any page.
+- The bootstrap logs `catalogue: 19 products … 6 categories` and finishes with no warnings. All 19 products have photos (243 files, every size generated).
+- `demo:reset` removed the 4 old merchandise products and kept the 19 laptops.
+- `task verify:k8s`: all checks pass. woo-mcp tests: 23 of 23.
+- **`task dod`: 19 of 19** on the new catalogue, including a ₹67,990 order converted to US dollars through `fx`.
+
+**Problems and fixes**
+1. **The cause of the broken images:** the bootstrap Job didn't mount the uploads volume. Media it created, including WooCommerce's placeholder, was written into the Job's own short-lived container, so the database pointed at files that never reached the web pod.
+   - Fix: the Job and wp-cron now mount `wp-uploads`. ReadWriteOnce allows it, since the scheduler places them on the volume's node.
+   - `seed.php` re-creates the placeholder and deletes the broken one, which had made `wp media regenerate` fail and with it a deploy.
+2. **WP-CLI can't set `woocommerce_task_list_hidden`** ("Could not update option"), which stopped the bootstrap. That line was dropped.
+3. **WooCommerce 11 ships its placeholder as `.webp`.** `seed.php` looks for `.webp`, then `.png`.
+4. **Storefront's theme support overrides WooCommerce's image-size settings** (416 px and 324 px). The child theme sets the sizes through `storefront_woocommerce_args`.
+5. **The product photo looked blank in full-page screenshots** while the gallery's zoom re-measured itself; a normal viewport screenshot shows it correctly. Lazy-loaded card photos also needed the screenshot script to scroll first.
+
+**Open question for the owner:** "urumi" also appears in technical names: the namespace, release and chart, the cluster, `@urumi/*` packages, image names, the session cookie, and docs about the Urumi brief. That's 543 places in 114 files. Renaming them means a fresh cluster and new image names; this change only covers the store.
+
 ### 2026-10-19 · Core complete: final check against the brief · ✅
 
 **What was done**

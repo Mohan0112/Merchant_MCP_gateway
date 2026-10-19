@@ -50,14 +50,14 @@ const client = (timeoutMs = 2000) =>
 
 const product = {
   id: 10,
-  name: 'Urumi Coffee Mug',
-  sku: 'URUMI-MUG',
+  name: 'Dell XPS 13',
+  sku: 'DEL-XPS13',
   price: '499',
   regular_price: '499',
   status: 'publish',
   stock_status: 'instock',
   stock_quantity: null,
-  permalink: 'https://store.127.0.0.1.nip.io/product/urumi-coffee-mug/',
+  permalink: 'https://store.127.0.0.1.nip.io/product/dell-xps-13/',
   description: '<p>A sturdy <b>mug</b>.</p>',
   short_description: '',
   categories: [{ name: 'Uncategorized' }],
@@ -77,9 +77,7 @@ describe('WooRestClient', () => {
     expect(seen[0]?.url.pathname).toBe('/wp-json/wc/v3/products');
     expect(seen[0]?.url.searchParams.get('search')).toBe('mug');
     expect(page.total).toBe(1);
-    expect(page.items[0]?.permalink).toBe(
-      'http://store.127.0.0.1.nip.io/product/urumi-coffee-mug/',
-    );
+    expect(page.items[0]?.permalink).toBe('http://store.127.0.0.1.nip.io/product/dell-xps-13/');
   });
 
   it('sends order windows as GMT with dates_are_gmt=true', async () => {
@@ -148,7 +146,7 @@ describe('WooRestClient', () => {
         name: 'Mug',
         regular_price: '499.00',
         status: 'publish',
-        sku: 'URUMI-MUG',
+        sku: 'DEL-XPS13',
       }),
     ).rejects.toMatchObject({ kind: 'invalid', message: 'Invalid or duplicated SKU.' });
   });
@@ -168,10 +166,10 @@ describe('WooRestClient', () => {
   it('reads timezone and currency for store settings', async () => {
     handler = (_req, url) =>
       url.pathname === '/wp-json/'
-        ? { status: 200, body: { name: 'Urumi Store', timezone_string: 'Asia/Kolkata' } }
+        ? { status: 200, body: { name: 'Ahjin', timezone_string: 'Asia/Kolkata' } }
         : { status: 200, body: { id: 'woocommerce_currency', value: 'INR' } };
     expect(await client().getStoreSettings()).toEqual({
-      name: 'Urumi Store',
+      name: 'Ahjin',
       store_url: 'http://store.127.0.0.1.nip.io',
       timezone: 'Asia/Kolkata',
       currency: 'INR',

@@ -4,7 +4,7 @@ A recording plan for the demo video. It covers every item of the brief's "Demo v
 
 ## Preparation (before recording)
 
-- [ ] `task demo:reset` → no orders, 4 sample products, all servers connected, users A and B, empty audit log.
+- [ ] `task demo:reset` → no orders, the 19-laptop catalogue, all servers connected, users A and B, empty audit log.
 - [ ] `task logins` → note the Admin, User A and User B logins. Sign in as Admin once beforehand, so the forced password change isn't in the video.
 - [ ] Three browser profiles side by side, signed in as **Admin**, **User A** and **User B**; a fourth tab with the storefront.
 - [ ] A terminal at the repo root, large font, with `kubectl config use-context k3d-urumi`. Claude Code installed. Remove any old entry first: `claude mcp remove urumi`.
@@ -38,14 +38,14 @@ kubectl -n urumi delete pod np-test
 
 ## 3. Store (1.5 min)
 
-Storefront tab → **Urumi Coffee Mug** → **Add to cart** → **View cart** → **Proceed to checkout** → billing details → **Cash on delivery** → **Place order**. Then **/wp-admin** → **WooCommerce → Orders**: the order is **Processing**.
+Storefront tab → **Dell XPS 13** → **Add to cart** → **View cart** → **Proceed to checkout** → billing details → **Cash on delivery** → **Place order**. Then **/wp-admin** → **WooCommerce → Orders**: the order is **Processing**.
 
 ## 4. Chat agent as User A (2.5 min)
 
 User A → **Chat**:
 
-1. `Create a product named "Urumi Water Bottle" with a price of 349.` Expand the `woo__create_product` card: arguments, result, duration.
-2. Storefront → **Shop**: the bottle is there. Order it by hand.
+1. `Create a product named "Ahjin Laptop Sleeve 14" with a price of 1499.` Expand the `woo__create_product` card: arguments, result, duration.
+2. Storefront → **Shop**: the sleeve is there. Order it by hand.
 3. `What orders came in today?` The agent calls `woo__list_orders` and lists both orders.
 
 - "The agent runs inside the gateway but calls the gateway's own MCP endpoint, as User A, with a five-minute token tied to her session. So permissions and the audit log are exactly the same as for an external client."

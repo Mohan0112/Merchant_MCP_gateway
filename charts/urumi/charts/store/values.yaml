@@ -36,7 +36,7 @@ mariadb:
 
 # Store settings applied by the bootstrap Job on every install/upgrade.
 settings:
-  name: Urumi Store
+  name: Ahjin
   currency: INR
   timezone: Asia/Kolkata
   country: 'IN:KA'

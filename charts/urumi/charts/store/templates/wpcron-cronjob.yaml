@@ -33,8 +33,16 @@ spec:
               command: [urumi-bootstrap, cron]
               env:
                 {{- include "store.wordpressEnv" . | nindent 16 }}
+              # Scheduled tasks write to uploads too (WooCommerce logs, generated files).
+              volumeMounts:
+                - name: uploads
+                  mountPath: /var/www/html/wp-content/uploads
               resources:
                 requests: { cpu: 50m, memory: 96Mi }
                 limits: { cpu: 500m, memory: 256Mi }
               securityContext:
                 {{- include "store.containerSecurityContext" . | nindent 16 }}
+          volumes:
+            - name: uploads
+              persistentVolumeClaim:
+                claimName: wp-uploads

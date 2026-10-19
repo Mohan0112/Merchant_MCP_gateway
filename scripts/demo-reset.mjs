@@ -6,7 +6,8 @@
 //   node scripts/demo-reset.mjs --context=k3d-urumi-rehearsal --scheme=https --insecure
 //
 // What it does:
-//   1. Store: deletes every order and every product except the four seeded samples.
+//   1. Store: deletes every order and every product that isn't in the seeded catalogue
+//      (docker/wordpress/catalog/products.json).
 //   2. Servers: enables every registered server, makes sure fx-mcp runs, and waits until all are
 //      connected.
 //   3. Users: deletes and re-creates the demo members "User A" (chat in the dashboard) and
@@ -15,6 +16,7 @@
 // Your own accounts and keys are never touched: like task dod, it works through a temporary admin
 // that it deletes at the end. The demo logins are stored in Secret demo-users (task logins).
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   clusterTools,
   inviteAndAccept,
@@ -28,7 +30,10 @@ const options = parseOptions();
 const { args, app: APP, store: STORE } = options;
 const { kubectl, psql, wp, secretValue } = clusterTools(options);
 const run = randomBytes(3).toString('hex');
-const SAMPLE_SKUS = new Set(['URUMI-MUG', 'URUMI-TEE', 'URUMI-NOTE', 'URUMI-STICKERS']);
+const CATALOG = JSON.parse(
+  readFileSync(new URL('../docker/wordpress/catalog/products.json', import.meta.url), 'utf8'),
+);
+const SAMPLE_SKUS = new Set(CATALOG.products.map((p) => p.sku));
 const DEMO_USERS = [
   { label: 'A', name: 'User A', email: args['a-email'] ?? 'user-a@example.com' },
   { label: 'B', name: 'User B', email: args['b-email'] ?? 'user-b@example.com' },
@@ -88,7 +93,9 @@ async function resetStore() {
     const extra = products.filter((p) => !SAMPLE_SKUS.has(p.sku));
     for (const p of extra) wp('wc', 'product', 'delete', String(p.id), '--force=true', storeAdmin);
     const missing = [...SAMPLE_SKUS].filter((sku) => !products.some((p) => p.sku === sku));
-    done(`deleted ${extra.length} products; ${products.length - extra.length} samples kept`);
+    done(
+      `deleted ${extra.length} products; ${products.length - extra.length} catalogue products kept`,
+    );
     if (missing.length) {
       console.log(
         `  ! samples missing (${missing.join(', ')}): task deploy:local re-runs the store bootstrap`,

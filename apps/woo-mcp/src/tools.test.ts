@@ -98,11 +98,14 @@ describe('woo-mcp tools', () => {
 
   it('create_product accepts a numeric price and publishes by default', async () => {
     const { run, calls } = setup();
-    const result = (await run('create_product', { name: 'Urumi Mug', regular_price: 499 })) as {
+    const result = (await run('create_product', {
+      name: 'Ahjin Laptop Sleeve',
+      regular_price: 499,
+    })) as {
       product: { id: number };
     };
     expect(calls.createProduct).toMatchObject({
-      name: 'Urumi Mug',
+      name: 'Ahjin Laptop Sleeve',
       regular_price: '499.00',
       status: 'publish',
     });

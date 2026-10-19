@@ -86,6 +86,12 @@ Every long-running workload has readiness and liveness probes, and every contain
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | ![Servers page with three connected servers](docs/screenshots/02-servers.png) | ![Chat answer with woo__list_orders and fx__convert_currency](docs/screenshots/12-chat-answer.png) | ![Audit log with both calls](docs/screenshots/13-audit.png) |
 
+The store is **Ahjin**, a laptop shop: 19 laptops from eight brands in six categories, on a Storefront child theme (`docker/wordpress/theme/ahjin`) with the catalogue seeded from `docker/wordpress/catalog`.
+
+| Home page                                                                       | A category                                               | Product page                                                                   | Phone                                                        |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Ahjin home page with hero and categories](docs/screenshots/20-store-home.jpg) | ![Gaming category](docs/screenshots/22-store-gaming.jpg) | ![Product page with key specifications](docs/screenshots/23-store-product.png) | ![Home page on a phone](docs/screenshots/24-store-phone.jpg) |
+
 ## What's in the repo
 
 | Path                      | What it is                                                                                                                                                              |
@@ -159,7 +165,7 @@ task deploy:local    # helm upgrade --install with values-local.yaml, then wait 
 task logins          # print the wp-admin and dashboard logins (local use only)
 ```
 
-The first run downloads the base images; the store image alone is about 1.4 GB. `task deploy:local` waits for the store bootstrap Job, which installs WordPress and WooCommerce, enables cash on delivery, creates the `mcp-bot` user that woo-mcp signs in as, and adds four sample products. `task secrets` is safe to re-run: generated values are created once, and values from `.env.local` are applied again each time (run `task deploy:local` afterwards so pods pick them up).
+The first run downloads the base images; the store image alone is about 1.4 GB. `task deploy:local` waits for the store bootstrap Job, which installs WordPress and WooCommerce, enables cash on delivery, creates the `mcp-bot` user that woo-mcp signs in as, seeds the Ahjin laptop catalogue (19 laptops with photos and specifications) and activates the Ahjin storefront theme. `task secrets` is safe to re-run: generated values are created once, and values from `.env.local` are applied again each time (run `task deploy:local` afterwards so pods pick them up).
 
 ### 3. Open it
 
@@ -198,7 +204,7 @@ The gateway's database tests run only when `TEST_DATABASE_URL` points at a Postg
 
 ### Place an order
 
-1. Open http://store.127.0.0.1.nip.io/shop/. It lists four sample products: Urumi Coffee Mug ₹499, Urumi T-Shirt ₹899, Urumi Notebook ₹249 and Urumi Sticker Pack ₹99.
+1. Open http://store.127.0.0.1.nip.io/shop/. It lists the Ahjin laptop catalogue: 19 laptops from Apple, Dell, Alienware, Lenovo, HP, ASUS, Acer and Microsoft in six categories (Gaming, Ultrabooks, Creators, Business, 2-in-1, Everyday), each with photos, specifications and stock.
 2. Open one and click **Add to cart**, then **View cart** and **Proceed to checkout**.
 3. Fill in the billing details: any name, an address in India, an email and a phone number. There is no shipping step; shipping is turned off on purpose.
 4. Choose **Cash on delivery** and click **Place order**.
@@ -271,7 +277,7 @@ Open **Chat** in the dashboard and ask in plain language. The agent calls the sa
 
 The brief's flow for user A:
 
-1. `Create a product named "Urumi Water Bottle" with a regular price of 349.` The agent calls `woo__create_product`, and the product is on http://store.127.0.0.1.nip.io/shop/ straight away.
+1. `Create a product named "Ahjin Laptop Sleeve 14" with a regular price of 1499.` The agent calls `woo__create_product`, and the product is on http://store.127.0.0.1.nip.io/shop/ straight away.
 2. Order that product on the storefront by hand, then ask `What orders came in today?`. The agent calls `woo__list_orders` with `period: today`, which woo-mcp works out in the store's timezone (Asia/Kolkata), and lists the order.
 
 The model is Groq's `openai/gpt-oss-120b`, with Google's `gemini-2.5-flash` as the fallback when Groq fails or rate-limits. A turn runs at most 8 rounds of the tool loop and 120 seconds.

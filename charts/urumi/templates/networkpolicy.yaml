@@ -1,0 +1,43 @@
+{{- if .Values.global.networkPolicy.enabled }}
+{{- $ic := .Values.global.networkPolicy.ingressController }}
+# Deny all ingress to every pod in the namespace. Each component's own policy then admits only the
+# pods it serves (plan §10.8), so a new or forgotten workload starts closed rather than open.
+# Egress is not restricted yet (Phase 2).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+{{- if .Values.global.tls.enabled }}
+---
+# cert-manager's HTTP-01 solver: while a certificate is issued, cert-manager runs a short-lived pod
+# in this namespace and routes /.well-known/acme-challenge/ to it through the ingress controller.
+# Without this rule the default deny above would block the challenge.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: acme-http01-solver
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: 'true'
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $ic.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $ic.podLabels | nindent 14 }}
+      ports:
+        - port: 8089
+          protocol: TCP
+{{- end }}
+{{- end }}

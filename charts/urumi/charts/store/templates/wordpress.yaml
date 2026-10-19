@@ -50,6 +50,7 @@ spec:
       labels:
         {{- include "store.labels" (list . "wordpress") | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 33

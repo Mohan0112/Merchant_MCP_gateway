@@ -1,0 +1,52 @@
+{{- if .Values.global.networkPolicy.enabled }}
+{{- $ic := .Values.global.networkPolicy.ingressController }}
+# PostgreSQL: only the gateway pod. Its migrate initContainer runs in the same pod, so it is covered.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+  labels:
+    {{- include "platform.labels" (list . "postgres") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (list . "postgres") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+      ports:
+        - port: postgres
+          protocol: TCP
+{{- /*
+The gateway and the dashboard: only the ingress controller. The chat agent reaches the gateway's
+own /mcp on 127.0.0.1 inside the pod, which NetworkPolicies never see.
+*/}}
+{{- range $name := list "gateway" "dashboard" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "platform.labels" (list $ $name) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (list $ $name) | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $ic.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $ic.podLabels | nindent 14 }}
+      ports:
+        - port: http
+          protocol: TCP
+{{- end }}
+{{- end }}

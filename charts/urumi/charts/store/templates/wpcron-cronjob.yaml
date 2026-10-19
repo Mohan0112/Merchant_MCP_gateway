@@ -21,6 +21,7 @@ spec:
             {{- include "store.labels" (list . "wp-cron") | nindent 12 }}
         spec:
           restartPolicy: Never
+          automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: true
             runAsUser: 33

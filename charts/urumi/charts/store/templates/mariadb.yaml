@@ -30,6 +30,7 @@ spec:
       labels:
         {{- include "store.labels" (list . "mariadb") | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 999

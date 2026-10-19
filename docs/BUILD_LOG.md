@@ -32,8 +32,8 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 14 | Dashboard screens | ✅ | Servers (status, tools, add/edit/disable/remove), members and invitations, API keys with client snippets, audit log |
 | 15 | Chat module | ✅ | Groq `gpt-oss-120b` with Gemini fallback; tool loop through the gateway's own `/mcp` as the signed-in user |
 | 16 | Chat UI | ✅ | Streaming answers with a card per tool call (arguments, result preview, duration) |
-| 17 | Kubernetes production readiness | ⏳ | MCP servers already gateway-only; store and platform NetworkPolicies next |
-| 18 | Definition-of-Done check and CI/CD | 🟡 | `task dod` runs the brief's DoD in-cluster (18/19 on its first run, the miss was the script's own expectation, now fixed); CI image builds pending |
+| 17 | Kubernetes production readiness | ✅ | Default-deny ingress + 7 allow policies (14/14 live connection tests), `task verify:k8s` in CI, NOTES fixed |
+| 18 | Definition-of-Done check and CI/CD | 🟡 | `task dod` 19/19 with the policies on; image and release workflows added (first run on this push); `task demo:reset` pending |
 | 19 | Production rehearsal (no VPS) | ⏳ | |
 | 20 | Documentation | ⏳ | |
 | 21 | Demo video | ⏳ | Owner records |
@@ -76,6 +76,7 @@ task secrets            # create/sync Kubernetes Secrets from .env.local (prints
 task images:build       # build + push images to the local registry (localhost:5001)
 task logins             # print generated wp-admin / dashboard logins (local only)
 task chart:lint         # helm lint + render with local and prod values
+task verify:k8s         # probes, requests/limits, non-root, NetworkPolicies, kubeconform (needs Docker)
 task deploy:local       # helm upgrade --install urumi on the local cluster
 task cluster:reset      # delete and recreate the cluster (loses all cluster data)
 task dod                # the brief's definition of done, end to end, against the running cluster
@@ -101,7 +102,9 @@ Common problems:
 - **`http://*.127.0.0.1.nip.io` doesn't load:** check the cluster is running (`k3d cluster list`), that nothing else holds port 80 (`Get-NetTCPConnection -LocalPort 80 -State Listen`), and that nip.io resolves (`nslookup store.127.0.0.1.nip.io`). Offline fallback: see `docs/local-domains.md`.
 - **Pod stuck in `ImagePullBackOff` for a local image:** push to `localhost:5001/<name>:<tag>` and reference it as `urumi-registry:5000/<name>:<tag>` in the pod spec.
 - **A pod is stuck in `CreateContainerConfigError`:** a referenced Secret or key is missing. Run `task secrets` and check `kubectl -n urumi describe pod <pod>`.
-- **A brand-new pod can't reach a NetworkPolicy-protected service for its first few seconds.** k3s's policy engine (kube-router) adds a new pod's IP to the allow-list a moment after the pod starts. Probe pods must wait (about 10 s) before testing, and services must retry upstream connections at startup.
+- **A brand-new pod can't reach a NetworkPolicy-protected service for its first second or two.** k3s's policy engine (kube-router) adds a new pod's IP to the allow-list a moment after the pod starts; measured: the first attempt is refused, the next one a second later succeeds. Probe pods must wait before testing, and anything short-lived must retry its first connection (the wp-cron job waits for MariaDB for exactly this reason).
+- **Is a connection allowed by the NetworkPolicies?** Start a throwaway pod with the label of the component you want to impersonate and try it: `kubectl -n urumi run np-test --image=busybox:1.37.0 --labels=app.kubernetes.io/name=gateway --restart=Never -- sleep 300`, wait a few seconds, then `kubectl -n urumi exec np-test -- nc -z -w 3 postgres 5432` (exit 0 = allowed). Delete the pod afterwards.
+- **Docker Desktop memory on the laptop:** WSL is capped at 5 GB in `%UserProfile%\.wslconfig` (`[wsl2] memory=5GB`). The stack itself needs about 2 GB; the rest of WSL's figure is Linux file cache. To hand the cache back to Windows immediately: `docker exec k3d-urumi-server-0 sh -c 'sync; echo 1 > /proc/sys/vm/drop_caches'`.
 - **Testing an MCP server by hand from inside the cluster:** run a pod labelled `app.kubernetes.io/name=gateway` (the only label the policy admits), inject the credential with `valueFrom.secretKeyRef` through `--overrides`, wait for the policy to sync, then pipe a script over stdin (`kubectl exec -i pod -- sh < script.sh`).
 - **`helm upgrade` fails with "conflict … with kubectl-patch":** Helm 4 applies manifests server-side and tracks field owners. Someone hand-edited a Helm-managed object, so `kubectl` co-owns a field. Don't hand-edit Helm-managed objects. To recover once, run `helm upgrade … --force-conflicts`.
 - **Gateway database tests:** they run only when `TEST_DATABASE_URL` is set. Locally: `docker run -d --name urumi-test-pg -p 55432:5432 -e POSTGRES_PASSWORD=test postgres:17.11-alpine`, then `TEST_DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/postgres pnpm turbo run test --filter=gateway`. CI provides a Postgres service container. The variable is declared in `turbo.json`, because Turborepo's strict env mode hides undeclared variables.
@@ -112,6 +115,56 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-19 · Task 17: Kubernetes production readiness · ✅
+
+**Context.** On 2026-10-15 eight agents worked on Tasks 17–20 in parallel and were all cut off together by the usage limit after about 18 minutes. Nothing was committed or deployed. Their partial chart work was kept, reviewed and finished here; the remaining tasks continue one at a time, with a commit after each.
+
+**What was done**
+- **NetworkPolicies, deny by default** (plan §10.8):
+  - `default-deny-ingress` selects every pod in `urumi`, so a new or forgotten workload starts closed.
+  - Allow rules, each restricted to one port:
+    - `mariadb` ← `wordpress`, `store-bootstrap`, `wp-cron` (3306)
+    - `wordpress` ← Traefik and `woo-mcp` (8080)
+    - `postgres` ← `gateway` (5432)
+    - `gateway` and `dashboard` ← Traefik (8080)
+    - `woo-mcp` and `fx-mcp` ← `gateway` (existing, unchanged rules)
+  - Traefik is matched by namespace **and** pod labels in one `from` entry, configurable as `global.networkPolicy.ingressController`. `global.networkPolicy.enabled` switches every policy off at once. The schema rejects an empty allow list, because that would admit every pod.
+  - With TLS on, an extra policy admits cert-manager's HTTP-01 solver pods, so certificate issuance isn't blocked.
+  - Egress stays open (Phase 2, Task 22).
+- **Workload audit:**
+  - `automountServiceAccountToken: false` on MariaDB, WordPress, the bootstrap Job and wp-cron. No component calls the Kubernetes API.
+  - Exec probe timeouts on Postgres raised to 5 s.
+  - Gateway memory request raised to 192Mi, after `kubectl top` showed about 165Mi idle.
+  - The Jobs document why they have no probes: they run to completion, and `activeDeadlineSeconds` bounds them.
+- **`scripts/verify-k8s.mjs` (`task verify:k8s`, also in CI).** It renders the chart with the local and the production values and fails on:
+  - a long-running container without readiness or liveness probes
+  - any container, including init containers, Jobs and CronJobs, without CPU and memory requests and limits
+  - a container that may run as root, allows privilege escalation, keeps capabilities, or has no `RuntimeDefault` seccomp profile
+  - with policies on: a missing default deny, an allow rule without sources or ports, a rule admitting a whole namespace, or a Service whose pods no allow rule admits
+  - a secret-like literal in any values file
+  - It then runs kubeconform v0.8.0 (Kubernetes 1.35 schemas, strict) in Docker. The root dev dependency `yaml` 2.9.1 was added for parsing.
+- **Chart NOTES** now print the real URLs (including the MCP endpoint), where the logins live, and what's public versus internal.
+- **wp-cron waits for MariaDB** (`docker/wordpress/bootstrap.sh`), see problem 1. The chart is now version 0.5.0.
+
+**Verification**
+- `task verify:k8s`: all checks pass for both renders. kubeconform: local 27 valid and 1 skipped (Traefik's `HelmChartConfig` CRD); prod 28 valid and 1 skipped.
+- Negative test: an override that removes the dashboard's limits makes it fail, naming both missing limits.
+- `helm upgrade` to revision 13 succeeded. All pods are Ready, the post-upgrade bootstrap Job completed, and the storefront (200), dashboard (200) and gateway (401 without a session) answer.
+- 14 live connection tests from throwaway pods, all passed:
+  - A pod with an unrelated label is blocked from all seven services.
+  - A pod labelled `gateway` reaches Postgres, woo-mcp and fx-mcp, but not MariaDB.
+  - A pod labelled `woo-mcp` reaches WordPress, but not MariaDB or Postgres.
+- `task dod` (real LLM): **19 of 19** with the policies on, including the killed upstream and its reconnection.
+
+**Problems and fixes**
+1. **wp-cron failed with "Error establishing a database connection"** once the MariaDB policy was on. A throwaway pod labelled `wp-cron` showed why: its first connection attempt is refused, and one second later it's open. kube-router admits a new pod's IP asynchronously, and wp-cron connects immediately without retrying. The bootstrap Job had survived only because it already waited for the database.
+   - Fix: cron mode now calls `wait_for_db 10` (up to 30 s) before running due events. The store image was rebuilt, and a manual cron run logs one wait and then succeeds.
+2. **Git Bash rewrote a `--values=C:/...` argument** into a broken Windows path. Running with `MSYS_NO_PATHCONV=1` fixes it; this only affects running the script by hand from Git Bash.
+
+**Follow-ups**
+- Default-deny egress, an SSRF guard and Pod Security Admission come in Phase 2 (Task 22).
+- `readOnlyRootFilesystem` is set for the Node services and the dashboard; WordPress, MariaDB and Postgres keep writable roots, because their images write outside their volumes.
 
 ### 2026-10-15 · Tasks 11–16 and part of 18: gateway core, chat agent, dashboard, DoD check · ✅
 

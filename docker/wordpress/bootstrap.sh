@@ -20,21 +20,25 @@ ensure_config() {
 }
 
 wait_for_db() {
-  for attempt in $(seq 1 60); do
+  local attempts="${1:-60}"
+  for attempt in $(seq 1 "$attempts"); do
     if [ "$(php "$WP_PATH/healthz.php" 2>/dev/null)" = "ok" ]; then
       log "database reachable"
       return 0
     fi
-    log "waiting for database ($attempt/60)"
+    log "waiting for database ($attempt/$attempts)"
     sleep 3
   done
-  log "database not reachable after 180s"
+  log "database not reachable after $((attempts * 3))s"
   return 1
 }
 
 ensure_config
 
 if [ "${1:-}" = "cron" ]; then
+  # k3s admits a new pod through MariaDB's NetworkPolicy a moment after the pod starts (the policy
+  # controller adds its IP asynchronously), so the first connection attempt can be refused.
+  wait_for_db 10
   wp cron event run --due-now
   exit 0
 fi

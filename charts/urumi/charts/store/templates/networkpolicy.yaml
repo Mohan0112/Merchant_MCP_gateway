@@ -1,0 +1,56 @@
+{{- if .Values.global.networkPolicy.enabled }}
+{{- $ic := .Values.global.networkPolicy.ingressController }}
+# MariaDB: only the store's own pods, which all run WordPress code: the web pod, the bootstrap Job
+# and the wp-cron CronJob. Nothing else in the cluster needs the database.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mariadb
+  labels:
+    {{- include "store.labels" (list . "mariadb") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "store.selectorLabels" (list . "mariadb") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range list "wordpress" "store-bootstrap" "wp-cron" }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ . }}
+        {{- end }}
+      ports:
+        - port: mysql
+          protocol: TCP
+---
+# WordPress: the ingress controller (storefront and wp-admin) and the pods in
+# wordpress.networkPolicy.allowFromPods (woo-mcp, which calls the REST API over this Service).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wordpress
+  labels:
+    {{- include "store.labels" (list . "wordpress") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "store.selectorLabels" (list . "wordpress") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $ic.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $ic.podLabels | nindent 14 }}
+        {{- range .Values.wordpress.networkPolicy.allowFromPods }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+      ports:
+        - port: http
+          protocol: TCP
+{{- end }}

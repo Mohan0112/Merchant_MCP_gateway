@@ -15,6 +15,11 @@ wordpress:
     # wp-content/uploads (product images and other media)
     size: 1Gi
     storageClass: ''
+  networkPolicy:
+    # In-cluster pods allowed to call WordPress besides the ingress controller: woo-mcp, which
+    # uses the WooCommerce REST API over the internal Service (ADR-0002).
+    allowFromPods:
+      - app.kubernetes.io/name: woo-mcp
 
 mariadb:
   image:

@@ -1,5 +1,9 @@
-{{- if .Values.networkPolicy.enabled }}
-# Only the listed pods (the gateway by default) may open connections to this MCP server.
+{{- if .Values.global.networkPolicy.enabled }}
+{{- if empty .Values.networkPolicy.allowFromPods }}
+{{- fail "networkPolicy.allowFromPods is empty: a rule without sources would admit every pod" }}
+{{- end }}
+# Only the listed pods (the gateway by default) may open connections to this MCP server. With the
+# namespace default deny, nothing else in the cluster can reach it, and it has no Ingress at all.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -20,4 +24,5 @@ spec:
         {{- end }}
       ports:
         - port: http
+          protocol: TCP
 {{- end }}

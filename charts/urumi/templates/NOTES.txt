@@ -1,5 +1,29 @@
-Release {{ .Release.Name }} installed in namespace {{ .Release.Namespace }}.
+{{- $scheme := .Values.global.scheme -}}
+{{- $ns := .Release.Namespace -}}
+Release {{ .Release.Name }} ({{ .Chart.Name }} {{ .Chart.Version }}) in namespace {{ $ns }}.
 
-Storefront: http://{{ include "urumi.host" (list . "store") }}
-Dashboard:  http://{{ include "urumi.host" (list . "app") }}
-(Components appear here as later tasks add them.)
+Public URLs (Ingress):
+{{- if .Values.store.enabled }}
+  Storefront    {{ $scheme }}://{{ include "urumi.host" (list . "store") }}/
+  Store admin   {{ $scheme }}://{{ include "urumi.host" (list . "store") }}/wp-admin/
+{{- end }}
+{{- if .Values.platform.enabled }}
+  Dashboard     {{ $scheme }}://{{ include "urumi.host" (list . "app") }}/
+  MCP endpoint  {{ $scheme }}://{{ include "urumi.host" (list . "app") }}/mcp  (bearer: an API key from the dashboard)
+{{- end }}
+Internal only: MariaDB, PostgreSQL, woo-mcp, fx-mcp and the health endpoints.
+{{- if .Values.global.networkPolicy.enabled }}
+NetworkPolicies deny ingress by default and admit only each component's known clients.
+{{- end }}
+
+Logins:
+  Local cluster:  task logins
+  Elsewhere:      Secret {{ dig "secrets" "wordpress" "store-wp" .Values.store }} (keys admin-user, admin-password) for the store admin,
+                  Secret {{ dig "secrets" "bootstrapAdmin" "gateway-bootstrap-admin" .Values.platform }} (keys email, password) for the first dashboard admin.
+
+Check it (from the repository root):
+  task dod      definition of done, end to end
+                another cluster: task dod -- --context=<context> --domain={{ .Values.global.domain }} --scheme={{ $scheme }}
+  kubectl -n {{ $ns }} get pods,ingress,networkpolicy
+  kubectl -n {{ $ns }} logs job/store-bootstrap
+  kubectl -n {{ $ns }} describe networkpolicy

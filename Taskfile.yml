@@ -119,6 +119,11 @@ tasks:
       - helm template {{.RELEASE}} {{.CHART}} -n {{.NAMESPACE}} -f {{.CHART}}/values-local.yaml > /dev/null
       - helm template {{.RELEASE}} {{.CHART}} -n {{.NAMESPACE}} -f {{.CHART}}/values-prod.yaml > /dev/null
 
+  verify:k8s:
+    desc: Check the rendered chart (probes, requests and limits, non-root, NetworkPolicies, no secret literals, kubeconform)
+    cmds:
+      - node scripts/verify-k8s.mjs {{.CLI_ARGS}}
+
   deploy:local:
     desc: Install or upgrade the release on the local cluster
     cmds:

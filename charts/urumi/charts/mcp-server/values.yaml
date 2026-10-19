@@ -17,8 +17,8 @@ env: {}
 secretEnv: {}
 
 networkPolicy:
-  enabled: true
-  # Pods (same namespace) allowed to call this server. Only the gateway, by default.
+  # Pods (same namespace) allowed to call this server: only the gateway, by default. Rendered when
+  # global.networkPolicy.enabled is on (the umbrella chart's single switch for every policy).
   allowFromPods:
     - app.kubernetes.io/name: gateway
 

@@ -61,14 +61,17 @@ spec:
               command: [pg_isready, -U, {{ .Values.postgres.user | quote }}, -d, {{ .Values.postgres.database | quote }}]
             periodSeconds: 2
             failureThreshold: 60
+          # Exec probes get 5 s (the default is 1 s), so a busy node doesn't restart a healthy database.
           readinessProbe:
             exec:
               command: [pg_isready, -U, {{ .Values.postgres.user | quote }}, -d, {{ .Values.postgres.database | quote }}]
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             exec:
               command: [pg_isready, -U, {{ .Values.postgres.user | quote }}, -d, {{ .Values.postgres.database | quote }}]
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 3
           resources:
             {{- toYaml .Values.postgres.resources | nindent 12 }}

@@ -3,6 +3,17 @@
   "type": "object",
   "required": ["global"],
   "definitions": {
+    "podLabels": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string" }
+    },
+    "allowFromPods": {
+      "description": "Label sets of same-namespace pods allowed in; an empty list would admit every pod",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/podLabels" }
+    },
     "mcpServer": {
       "type": "object",
       "properties": {
@@ -21,6 +32,11 @@
             "required": ["secret", "key"],
             "properties": { "secret": { "type": "string" }, "key": { "type": "string" } }
           }
+        },
+        "networkPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "allowFromPods": { "$ref": "#/definitions/allowFromPods" } }
         }
       }
     }
@@ -28,7 +44,7 @@
   "properties": {
     "global": {
       "type": "object",
-      "required": ["domain", "ingressClassName", "tls"],
+      "required": ["domain", "ingressClassName", "tls", "networkPolicy"],
       "properties": {
         "domain": { "type": "string", "minLength": 3 },
         "scheme": { "enum": ["http", "https"] },
@@ -40,6 +56,22 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "clusterIssuer": { "type": "string" }
+          }
+        },
+        "networkPolicy": {
+          "type": "object",
+          "required": ["enabled", "ingressController"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "ingressController": {
+              "type": "object",
+              "required": ["namespace", "podLabels"],
+              "additionalProperties": false,
+              "properties": {
+                "namespace": { "type": "string", "minLength": 1 },
+                "podLabels": { "$ref": "#/definitions/podLabels" }
+              }
+            }
           }
         }
       }
@@ -65,6 +97,12 @@
               "properties": {
                 "repository": { "type": "string", "minLength": 1 },
                 "tag": { "type": "string", "minLength": 1 }
+              }
+            },
+            "networkPolicy": {
+              "type": "object",
+              "properties": {
+                "allowFromPods": { "type": "array", "items": { "$ref": "#/definitions/podLabels" } }
               }
             }
           }

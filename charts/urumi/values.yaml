@@ -12,6 +12,17 @@ global:
     # Production terminates TLS at Traefik with certificates from cert-manager.
     enabled: false
     clusterIssuer: ''
+  # NetworkPolicies (plan §10.8): every pod in the namespace denies ingress by default, and each
+  # component admits only the pods it serves. This one switch turns all of them on or off.
+  # Egress stays open (Phase 2).
+  networkPolicy:
+    enabled: true
+    # The ingress controller's pods, admitted to WordPress, the gateway and the dashboard.
+    # k3s bundles Traefik in kube-system; change this for another controller.
+    ingressController:
+      namespace: kube-system
+      podLabels:
+        app.kubernetes.io/name: traefik
 
 traefik:
   # Render a k3s HelmChartConfig that raises Traefik's timeouts so long-lived SSE streams

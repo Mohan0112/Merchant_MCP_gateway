@@ -5,32 +5,20 @@
 //   node scripts/dod-check.mjs --skip-chat     # without the steps that need the LLM
 //   node scripts/dod-check.mjs --keep          # keep the temporary users, audit rows and store data
 //   node scripts/dod-check.mjs --domain=example.com --scheme=https --context=my-vps
+//   node scripts/dod-check.mjs --scheme=https --insecure   # self-signed certificates (rehearsal)
 //
 // It never touches your own accounts: a temporary admin is inserted directly into PostgreSQL, and
 // users A and B are invited through the API like real members. Then it walks the flow:
 // store checkout, chat agent as A, external MCP client as B, key revocation, disabling a server,
 // a dead upstream, and the audit log. At the end it removes everything it created (users, their
 // keys and audit rows, test products and orders), so "orders today" in your demo stays clean.
-import { execFileSync } from 'node:child_process';
-import { randomBytes, scrypt as scryptCb } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { promisify } from 'node:util';
+import { clusterTools, parseOptions, Session, sqlText, temporaryAdmin } from './lib/cluster.mjs';
 
-const scrypt = promisify(scryptCb);
-
-const args = Object.fromEntries(
-  process.argv.slice(2).map((arg) => {
-    const [key, ...rest] = arg.replace(/^--/, '').split('=');
-    return [key, rest.length ? rest.join('=') : 'true'];
-  }),
-);
-const context = args.context ?? 'k3d-urumi';
-const namespace = args.namespace ?? 'urumi';
-const domain = args.domain ?? '127.0.0.1.nip.io';
-const scheme = args.scheme ?? 'http';
-const APP = `${scheme}://app.${domain}`;
-const STORE = `${scheme}://store.${domain}`;
+const options = parseOptions();
+const { args, app: APP, store: STORE } = options;
 const skipChat = args['skip-chat'] === 'true';
 const keep = args.keep === 'true';
 const run = randomBytes(3).toString('hex');
@@ -75,84 +63,14 @@ async function eventually(fn, timeoutMs, everyMs = 2000) {
   }
 }
 
-// ---------- cluster helpers ----------
+// ---------- cluster and HTTP helpers ----------
 
-function kubectl(argv, input) {
-  return execFileSync('kubectl', ['--context', context, '-n', namespace, ...argv], {
-    input,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-  }).trim();
-}
-const psql = (sql) =>
-  kubectl(
-    [
-      'exec',
-      '-i',
-      'postgres-0',
-      '--',
-      'psql',
-      '-U',
-      'urumi',
-      '-d',
-      'urumi',
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-At',
-    ],
-    sql,
-  );
-const sqlText = (value) => `'${String(value).replaceAll("'", "''")}'`;
-const wp = (...argv) => kubectl(['exec', 'deploy/wordpress', '--', 'wp', ...argv]);
-const secretValue = (name, key) =>
-  Buffer.from(
-    kubectl(['get', 'secret', name, '-o', `jsonpath={.data.${key}}`]),
-    'base64',
-  ).toString();
+const { kubectl, psql, wp, secretValue } = clusterTools(options);
 
-/** Same format as the gateway's hashPassword (scrypt N=2^15, r=8, p=3). */
-async function hashPassword(password) {
-  const salt = randomBytes(16);
-  const key = await scrypt(password, salt, 64, {
-    N: 2 ** 15,
-    r: 8,
-    p: 3,
-    maxmem: 64 * 1024 * 1024,
-  });
-  return ['scrypt', 2 ** 15, 8, 3, salt.toString('base64url'), key.toString('base64url')].join('$');
-}
-
-// ---------- HTTP helpers ----------
-
-/** A browser session against the dashboard API: cookie jar and the anti-CSRF header on writes. */
-class Session {
-  cookie = '';
-  async request(method, path, body) {
-    const res = await fetch(`${APP}${path}`, {
-      method,
-      headers: {
-        ...(this.cookie ? { cookie: this.cookie } : {}),
-        ...(method !== 'GET' ? { 'x-requested-with': 'fetch' } : {}),
-        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    const setCookie = res.headers.get('set-cookie');
-    if (setCookie) this.cookie = setCookie.split(';')[0];
-    const text = await res.text();
-    let json;
-    try {
-      json = text ? JSON.parse(text) : undefined;
-    } catch {
-      json = undefined;
-    }
-    return { status: res.status, json, text };
-  }
-  async ok(method, path, body) {
-    const res = await this.request(method, path, body);
-    if (res.status >= 400)
-      throw new Error(`${method} ${path} → HTTP ${res.status}: ${res.text.slice(0, 200)}`);
-    return res.json;
+/** A dashboard session that can also run one chat turn. */
+class ChatSession extends Session {
+  constructor() {
+    super(APP);
   }
   /** One chat turn; returns the server-sent events. */
   async chat(content) {
@@ -231,9 +149,9 @@ const resultText = (result) => (result.content ?? []).map((c) => c.text ?? '').j
 // ---------- the run ----------
 
 const created = { userIds: [], productIds: [], orderIds: [] };
-const admin = new Session();
-const userA = new Session();
-const userB = new Session();
+let admin;
+const userA = new ChatSession();
+const userB = new ChatSession();
 let fxId;
 let fxScaledDown = false;
 let fxDisabled = false;
@@ -241,17 +159,16 @@ let fxDisabled = false;
 async function setUp() {
   section('Setup');
   await check('gateway answers through the ingress', async () => {
-    const res = await new Session().request('GET', '/api/auth/me');
+    const res = await new Session(APP).request('GET', '/api/auth/me');
     assert(res.status === 401, `expected 401 without a session, got ${res.status}`);
   });
-  const adminEmail = `dod-admin-${run}@example.com`;
-  const adminPassword = randomBytes(18).toString('base64url');
-  const hash = await hashPassword(adminPassword);
-  const id = psql(
-    `insert into users (email, name, password_hash, role) values (${sqlText(adminEmail)}, 'DoD check admin', ${sqlText(hash)}, 'admin') returning id;`,
-  ).split('\n')[0];
-  created.userIds.push(id);
-  await admin.ok('POST', '/api/auth/login', { email: adminEmail, password: adminPassword });
+  const temporary = await temporaryAdmin(
+    { app: APP, psql },
+    `dod-admin-${run}@example.com`,
+    'DoD check admin',
+  );
+  admin = temporary.session;
+  created.userIds.push(temporary.id);
 
   for (const [label, session] of [
     ['A', userA],

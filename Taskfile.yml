@@ -108,6 +108,12 @@ tasks:
           $(kubectl -n {{.NAMESPACE}} get secret gateway-bootstrap-admin -o jsonpath='{.data.email}' | base64 -d)
           password: $(kubectl -n {{.NAMESPACE}} get secret gateway-bootstrap-admin -o jsonpath='{.data.password}' | base64 -d)"
         silent: true
+      # Demo members A and B exist once task demo:reset has run.
+      - cmd: >-
+          if kubectl -n {{.NAMESPACE}} get secret demo-users >/dev/null 2>&1; then
+          for u in a b; do echo "demo user $u $(kubectl -n {{.NAMESPACE}} get secret demo-users -o jsonpath="{.data.user-$u-email}" | base64 -d)
+          password: $(kubectl -n {{.NAMESPACE}} get secret demo-users -o jsonpath="{.data.user-$u-password}" | base64 -d)"; done; fi
+        silent: true
 
   # ---------- Helm ----------
 
@@ -148,6 +154,12 @@ tasks:
     prompt: This deletes the store database and all uploads. Continue?
     cmds:
       - kubectl -n {{.NAMESPACE}} delete pvc wp-uploads data-mariadb-0 --ignore-not-found
+
+  demo:reset:
+    desc: Clean demo state - no orders, sample products only, all servers on, fresh users A and B, empty audit log
+    prompt: This deletes every order, every non-sample product and the audit log, and recreates users A and B. Continue?
+    cmds:
+      - node scripts/demo-reset.mjs --context={{.CONTEXT}} --namespace={{.NAMESPACE}} {{.CLI_ARGS}}
 
   dod:
     desc: Check the brief's definition of done end to end against the running cluster (CLI_ARGS e.g. -- --skip-chat)

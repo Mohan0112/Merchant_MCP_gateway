@@ -33,7 +33,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 15 | Chat module | ✅ | Groq `gpt-oss-120b` with Gemini fallback; tool loop through the gateway's own `/mcp` as the signed-in user |
 | 16 | Chat UI | ✅ | Streaming answers with a card per tool call (arguments, result preview, duration) |
 | 17 | Kubernetes production readiness | ✅ | Default-deny ingress + 7 allow policies (14/14 live connection tests), `task verify:k8s` in CI, NOTES fixed |
-| 18 | Definition-of-Done check and CI/CD | 🟡 | `task dod` 19/19 with the policies on; image and release workflows added (first run on this push); `task demo:reset` pending |
+| 18 | Definition-of-Done check and CI/CD | ✅ | `task dod` 19/19; CI pushes five public images to GHCR per commit; chart release on tags; `task demo:reset` |
 | 19 | Production rehearsal (no VPS) | ⏳ | |
 | 20 | Documentation | ⏳ | |
 | 21 | Demo video | ⏳ | Owner records |
@@ -81,6 +81,7 @@ task deploy:local       # helm upgrade --install urumi on the local cluster
 task cluster:reset      # delete and recreate the cluster (loses all cluster data)
 task dod                # the brief's definition of done, end to end, against the running cluster
 task dod -- --skip-chat # same without the LLM steps
+task demo:reset         # clean demo state: no orders, sample products, all servers on, fresh users A and B, empty audit log
 ```
 
 `task dod` never touches real accounts. It inserts a temporary admin into PostgreSQL and invites users A and B through the API. At the end it deletes them, their keys and audit rows, and the store's test products and orders, so "orders today" stays clean for the demo.
@@ -115,6 +116,39 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-19 · Task 18: CI image publishing, chart release and demo reset · ✅
+
+**What was done**
+- **`.github/workflows/images.yml`:** on every push to `main`, a matrix job builds the five images exactly like the Taskfile does (wordpress, woo-mcp, fx-mcp, gateway, dashboard) for linux/amd64.
+  - Pushes to `ghcr.io/mohan0112/merchant_mcp_gateway/<app>`, tagged with the full git SHA and `main`.
+  - Uses the GitHub Actions layer cache, one scope per image.
+  - Sets the `org.opencontainers.image.source` label, which links each package to the repo.
+- **`.github/workflows/release.yml`:** a `vX.Y.Z` tag packages `charts/urumi` at that version and creates a GitHub release with the chart attached and generated notes.
+- **`scripts/demo-reset.mjs` (`task demo:reset`, which asks for confirmation first):**
+  - Store: deletes every order, and every product except the four seeded samples (matched by SKU).
+  - Servers: makes sure `fx-mcp` runs, enables every server, and waits until all are connected.
+  - Users: removes users left over by interrupted runs, then recreates the members `user-a@example.com` and `user-b@example.com` with new passwords.
+  - Audit log: empties it.
+  - Like `task dod`, it works through a temporary admin and never touches real accounts.
+  - The demo logins go to Secret `demo-users`. `task logins` prints them; the script prints them only when run in a terminal.
+- **`scripts/lib/cluster.mjs`:** the plumbing shared by `dod-check` and `demo-reset`, moved out of `dod-check.mjs` (105 lines fewer there):
+  - option parsing, `kubectl`, `psql` and WP-CLI helpers, the dashboard session
+  - temporary admin and invitation helpers
+  - a new `--insecure` option for self-signed certificates (the production rehearsal)
+
+**Verification**
+- Both workflows pass actionlint 1.7.7, and every pinned action tag exists.
+- First run on `c3ecdb3`: all five image jobs succeeded and CI is green. An **anonymous** pull of `gateway` and `wordpress` at that SHA returns HTTP 200, so the packages are public and a VPS needs no pull secret.
+- `demo:reset` on the local cluster:
+  - deleted the leftover order and product, kept the 4 samples, all 3 servers connected
+  - users A and B created; both sign in as members, without a forced password change
+  - the owner's admin account is untouched
+  - a second run gives the same result
+- `dod-check` after the refactor: 16 of 16 with `--skip-chat`.
+
+**Problems and fixes**
+1. **The first `demo:reset` deleted its own temporary admin.** The clean-up of leftover temporary users (`demo-reset-%@example.com`) also matched the run's own admin, so the next call got 401. The clean-up now excludes the current run's admin id.
 
 ### 2026-10-19 · Task 17: Kubernetes production readiness · ✅
 

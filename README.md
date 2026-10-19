@@ -10,6 +10,8 @@ An admin registers MCP servers once in a dashboard. Every team member then uses 
 
 ## For reviewers
 
+Every line of the brief, with where it is implemented and how it was verified: [docs/brief-checklist.md](docs/brief-checklist.md).
+
 | The brief asks for                                                      | Where it is                                                                                                      |
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Local setup instructions                                                | [Local setup](#local-setup)                                                                                      |
@@ -422,15 +424,16 @@ Where each optional item from the brief stands. Everything marked "not started" 
 
 ## Documentation
 
-| Document                                       | What it covers                                                                                                                                |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| [docs/system-design.md](docs/system-design.md) | Architecture choices, tool aggregation, routing and failure handling, what changes for production                                             |
-| [docs/threat-model.md](docs/threat-model.md)   | Shared upstream credentials, why client tokens aren't passed through, untrusted upstreams, what one member can do to another                  |
-| [docs/demo-script.md](docs/demo-script.md)     | The demo, step by step, with two users                                                                                                        |
-| [docs/runbooks/](docs/runbooks/)               | `dod-manual.md`, `vps.md`, `upgrade-and-rollback.md`, `revoke-compromised-key.md`, `rotate-upstream-credential.md`, `upstream-unreachable.md` |
-| [docs/adr/](docs/adr/)                         | Decision records: TypeScript monorepo, WooCommerce REST with Basic Auth, MCP SDK v2 with a stateless gateway                                  |
-| [docs/local-domains.md](docs/local-domains.md) | The local domain approach                                                                                                                     |
-| [docs/walkthrough/](docs/walkthrough/)         | One note per milestone (M0 to M4): what exists, why, and likely questions                                                                     |
-| [docs/spikes.md](docs/spikes.md)               | The three experiments run before building on WooCommerce auth, the MCP SDK and the LLM tool loop                                              |
-| [docs/BUILD_LOG.md](docs/BUILD_LOG.md)         | What was built, how it was verified, and the problems hit along the way                                                                       |
-| [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)   | The full design and task plan, including Phase 2                                                                                              |
+| Document                                           | What it covers                                                                                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| [docs/brief-checklist.md](docs/brief-checklist.md) | Every requirement of the brief, where it is implemented and how it was verified                                                               |
+| [docs/system-design.md](docs/system-design.md)     | Architecture choices, tool aggregation, routing and failure handling, what changes for production                                             |
+| [docs/threat-model.md](docs/threat-model.md)       | Shared upstream credentials, why client tokens aren't passed through, untrusted upstreams, what one member can do to another                  |
+| [docs/demo-script.md](docs/demo-script.md)         | The demo, step by step, with two users                                                                                                        |
+| [docs/runbooks/](docs/runbooks/)                   | `dod-manual.md`, `vps.md`, `upgrade-and-rollback.md`, `revoke-compromised-key.md`, `rotate-upstream-credential.md`, `upstream-unreachable.md` |
+| [docs/adr/](docs/adr/)                             | Decision records: TypeScript monorepo, WooCommerce REST with Basic Auth, MCP SDK v2 with a stateless gateway                                  |
+| [docs/local-domains.md](docs/local-domains.md)     | The local domain approach                                                                                                                     |
+| [docs/walkthrough/](docs/walkthrough/)             | One note per milestone (M0 to M4): what exists, why, and likely questions                                                                     |
+| [docs/spikes.md](docs/spikes.md)                   | The three experiments run before building on WooCommerce auth, the MCP SDK and the LLM tool loop                                              |
+| [docs/BUILD_LOG.md](docs/BUILD_LOG.md)             | What was built, how it was verified, and the problems hit along the way                                                                       |
+| [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)       | The full design and task plan, including Phase 2                                                                                              |

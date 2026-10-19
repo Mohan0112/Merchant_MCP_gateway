@@ -37,7 +37,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 19 | Production rehearsal (no VPS) | ✅ | Prod values + GHCR images on a fresh single-node k3s over HTTPS: DoD 19/19; upgrade, rollback and auto-rollback drill; VPS runbook |
 | 20 | Documentation | ✅ | README, system design, threat model, demo script, 7 runbooks, walkthroughs M3–M4; every claim checked against the code, 110 links resolve |
 | 21 | Demo video | ⏳ | Owner records |
-| 22–30 | Phase 2 extras | ⏳ | Start after Task 18 passes |
+| 22–30 | Phase 2 extras | ⏳ | Next; core complete (every mandatory item of the brief: `docs/brief-checklist.md`) |
 | 31 | Live VPS deployment | ⏸️ | Deferred by the owner |
 
 ---
@@ -116,6 +116,30 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-19 · Core complete: final check against the brief · ✅
+
+**What was done**
+- **`docs/brief-checklist.md`** maps every line of the brief to where it is implemented and how it was verified: user stories, definition of done, all mandatory requirements, deliverables, demo and submission. The README's reviewer section links it.
+- **Result:** every mandatory item is ✅. One item is 🟡: deployment to a real VPS, which the owner deferred; it's proven by the production rehearsal and the runbook. Two items remain for the owner: the demo video (script in `docs/demo-script.md`) and the submission form.
+- **Clean-up:**
+  - Removed the stopped `urumi-test-pg` container; *Resume or debug* shows how to recreate it.
+  - Scratch scripts live outside the repository.
+  - The repository tree is clean.
+  - The older copy of the plan at `URUMI.ai/docs/PROJECT_PLAN.md`, outside the repo, is out of date; `Project/docs/PROJECT_PLAN.md` is the current one. It was left in place for the owner to delete.
+
+**Verification**
+- `pnpm turbo run lint typecheck test build --force`: 25 of 25.
+- The first run of the day had one failure in `@urumi/mcp-kit#test`. Then:
+  - the same tests passed alone (11 of 11)
+  - three parallel runs alongside a full typecheck and build all passed
+  - a second full forced run passed 25 of 25
+  - CI has been green on every push today
+
+**Follow-ups**
+- Flaky test (open): the failing test's output wasn't captured, because the first run's output was piped through a filter. If it recurs, rerun with `pnpm turbo run test --filter=@urumi/mcp-kit --output-logs=full`. The likely cause is Vitest's default 5 s test timeout under heavy CPU load, from 25 tasks plus the cluster on a laptop. If so, raise `testTimeout` for the end-to-end MCP tests.
+
+**Next: Phase 2,** in the plan's order (§15): Task 22 security hardening → 23 tool permissions → 24 observability → 28 upgrades and backups → 30 multi-store bonus → 25 scaling and rate limits → 26 many-tools handling → 29 hosted MCP servers → 27 OAuth. Task 31, the live VPS, can run whenever a VPS is available.
 
 ### 2026-10-19 · Task 20: Documentation · ✅
 

@@ -1,0 +1,17 @@
+# Production rehearsal on a laptop (task rehearsal:*): applied ON TOP of values-prod.yaml, so
+# everything else is exactly production: HTTPS through cert-manager, the GHCR images CI built,
+# production volume sizes and limits, logLevel info. Only what a laptop can't provide differs.
+
+global:
+  # No public DNS name on a laptop; nip.io resolves to 127.0.0.1 like the local cluster.
+  domain: 127.0.0.1.nip.io
+  tls:
+    # Let's Encrypt can't reach a laptop to validate HTTP-01, so certificates are self-signed.
+    clusterIssuer: selfsigned
+
+certManager:
+  selfSigned:
+    enabled: true
+  # Nothing would be issued from these, and they'd need a real email.
+  letsEncrypt:
+    enabled: false

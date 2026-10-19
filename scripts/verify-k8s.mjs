@@ -5,7 +5,7 @@
 //   node scripts/verify-k8s.mjs --no-kubeconform     # skip schema validation (no Docker needed)
 //   node scripts/verify-k8s.mjs --values=a.yaml,b.yaml   # one extra render with these values files
 //
-// It fails when a long-running container has no readiness or liveness probe, when any container
+// (local, production, and production + rehearsal). It fails when a long-running container has no readiness or liveness probe, when any container
 // (init containers, Jobs and CronJobs included) lacks CPU and memory requests and limits, when a pod
 // may run as root or keeps privilege escalation or capabilities, when NetworkPolicies are on but a
 // Service's pods aren't admitted by an allow policy or the namespace default deny is missing, and
@@ -28,6 +28,7 @@ const KUBERNETES_VERSION = '1.35.0';
 const renders = [
   { name: 'local', values: [`${CHART}/values-local.yaml`] },
   { name: 'prod', values: [`${CHART}/values-prod.yaml`] },
+  { name: 'rehearsal', values: [`${CHART}/values-prod.yaml`, `${CHART}/values-rehearsal.yaml`] },
 ];
 if (args.values) renders.push({ name: 'custom', values: args.values.split(',') });
 

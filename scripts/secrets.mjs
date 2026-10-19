@@ -2,8 +2,8 @@
 // Creates the Kubernetes Secrets the Helm chart references by name (ADR-008).
 //
 //   node scripts/secrets.mjs                         # local cluster (context k3d-urumi)
-//   node scripts/secrets.mjs --context my-vps        # another cluster
-//   node scripts/secrets.mjs --recreate store-db     # delete and regenerate one Secret
+//   node scripts/secrets.mjs --context=my-vps        # another cluster
+//   node scripts/secrets.mjs --recreate=fx-mcp-auth  # delete and regenerate Secrets (comma-separated)
 //
 // - Values you provide come from .env.local (never committed) and are re-applied on every run.
 // - Random values are generated only when a Secret doesn't exist yet, so re-running never rotates

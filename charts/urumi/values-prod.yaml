@@ -1,11 +1,19 @@
-# Production-like VPS running k3s (Task 31; rehearsed locally in Task 19).
+# Production-like VPS running k3s (docs/runbooks/vps.md; rehearsed locally with values-rehearsal.yaml).
+# The CHANGE-ME values are set at deploy time: task deploy:prod passes the domain, the image tag
+# (the git SHA CI built) and the Let's Encrypt email with --set.
 global:
   domain: CHANGE-ME.duckdns.org
   scheme: https
   logLevel: info
   tls:
     enabled: true
+    # Use letsencrypt-staging for the first install, then switch (docs/runbooks/vps.md).
     clusterIssuer: letsencrypt-prod
+
+certManager:
+  letsEncrypt:
+    enabled: true
+    email: CHANGE-ME@example.com
 
 store:
   wordpress:

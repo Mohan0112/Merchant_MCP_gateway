@@ -24,6 +24,19 @@ global:
       podLabels:
         app.kubernetes.io/name: traefik
 
+# cert-manager ClusterIssuers rendered by this chart (cert-manager itself, with its CRDs, is a
+# prerequisite installed separately). Point global.tls.clusterIssuer at one of them.
+certManager:
+  # For the local production rehearsal: every certificate signs itself.
+  selfSigned:
+    enabled: false
+    name: selfsigned
+  # For a public server: renders letsencrypt-staging and letsencrypt-prod (ACME HTTP-01).
+  letsEncrypt:
+    enabled: false
+    # Expiry notices go here. Not a secret, but personal, so set it in your own values.
+    email: ''
+
 traefik:
   # Render a k3s HelmChartConfig that raises Traefik's timeouts so long-lived SSE streams
   # (GET /mcp, /api/chat) aren't cut after the default 60 s read timeout.

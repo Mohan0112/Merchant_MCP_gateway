@@ -10,6 +10,19 @@ vars:
   CHART: charts/urumi
   REGISTRY: localhost:5001
   TAG: dev
+  # Production rehearsal and VPS
+  REHEARSAL_CLUSTER: urumi-rehearsal
+  REHEARSAL_CONTEXT: k3d-urumi-rehearsal
+  CERT_MANAGER_VERSION: v1.21.2
+  # Images CI pushed to GHCR for this commit (override: task rehearsal:deploy IMAGE_TAG=<sha>).
+  IMAGE_TAG:
+    sh: git rev-parse origin/main
+  IMAGE_TAG_SETS: >-
+    --set store.wordpress.image.tag={{.IMAGE_TAG}}
+    --set woo-mcp.image.tag={{.IMAGE_TAG}}
+    --set fx-mcp.image.tag={{.IMAGE_TAG}}
+    --set platform.gateway.image.tag={{.IMAGE_TAG}}
+    --set platform.dashboard.image.tag={{.IMAGE_TAG}}
 
 tasks:
   install:
@@ -165,3 +178,59 @@ tasks:
     desc: Check the brief's definition of done end to end against the running cluster (CLI_ARGS e.g. -- --skip-chat)
     cmds:
       - node scripts/dod-check.mjs --context={{.CONTEXT}} --namespace={{.NAMESPACE}} {{.CLI_ARGS}}
+
+  # ---------- Production rehearsal and VPS ----------
+
+  cert-manager:
+    desc: Install cert-manager and its CRDs into a cluster (task cert-manager KUBE_CONTEXT=<context>)
+    requires:
+      vars: [KUBE_CONTEXT]
+    cmds:
+      - >-
+        helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager
+        --version {{.CERT_MANAGER_VERSION}} --kube-context {{.KUBE_CONTEXT}}
+        --namespace cert-manager --create-namespace --set crds.enabled=true --wait --timeout 5m
+
+  rehearsal:up:
+    desc: Stop the local cluster and create the single-node rehearsal cluster with cert-manager
+    cmds:
+      - k3d cluster stop {{.CLUSTER}}
+      - k3d cluster create --config deploy/k3d/rehearsal.yaml
+      - task: cert-manager
+        vars: { KUBE_CONTEXT: '{{.REHEARSAL_CONTEXT}}' }
+
+  rehearsal:deploy:
+    desc: Install the chart on the rehearsal cluster with values-prod.yaml + values-rehearsal.yaml and CI's GHCR images
+    cmds:
+      - node scripts/secrets.mjs --context={{.REHEARSAL_CONTEXT}} --namespace={{.NAMESPACE}}
+      - >-
+        helm upgrade --install {{.RELEASE}} {{.CHART}} --kube-context {{.REHEARSAL_CONTEXT}}
+        --namespace {{.NAMESPACE}} --create-namespace
+        -f {{.CHART}}/values-prod.yaml -f {{.CHART}}/values-rehearsal.yaml {{.IMAGE_TAG_SETS}}
+        --wait --timeout 15m --rollback-on-failure
+
+  rehearsal:dod:
+    desc: The definition-of-done check over HTTPS against the rehearsal cluster (self-signed certificates)
+    cmds:
+      - node scripts/dod-check.mjs --context={{.REHEARSAL_CONTEXT}} --namespace={{.NAMESPACE}} --scheme=https --insecure {{.CLI_ARGS}}
+
+  rehearsal:down:
+    desc: Delete the rehearsal cluster and start the local cluster again
+    cmds:
+      - k3d cluster delete {{.REHEARSAL_CLUSTER}}
+      - k3d cluster start {{.CLUSTER}}
+
+  deploy:prod:
+    desc: Install or upgrade on a VPS (task deploy:prod PROD_CONTEXT=<ctx> DOMAIN=<domain> LETSENCRYPT_EMAIL=<email> [ISSUER=letsencrypt-staging])
+    requires:
+      vars: [PROD_CONTEXT, DOMAIN, LETSENCRYPT_EMAIL]
+    vars:
+      ISSUER: '{{.ISSUER | default "letsencrypt-prod"}}'
+    cmds:
+      - echo "Deploying images {{.IMAGE_TAG}} to {{.DOMAIN}} on context {{.PROD_CONTEXT}} (issuer {{.ISSUER}})"
+      - >-
+        helm upgrade --install {{.RELEASE}} {{.CHART}} --kube-context {{.PROD_CONTEXT}}
+        --namespace {{.NAMESPACE}} --create-namespace -f {{.CHART}}/values-prod.yaml
+        --set global.domain={{.DOMAIN}} --set global.tls.clusterIssuer={{.ISSUER}}
+        --set certManager.letsEncrypt.email={{.LETSENCRYPT_EMAIL}} {{.IMAGE_TAG_SETS}}
+        --wait --timeout 15m --rollback-on-failure

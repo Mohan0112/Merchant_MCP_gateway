@@ -34,7 +34,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 16 | Chat UI | ✅ | Streaming answers with a card per tool call (arguments, result preview, duration) |
 | 17 | Kubernetes production readiness | ✅ | Default-deny ingress + 7 allow policies (14/14 live connection tests), `task verify:k8s` in CI, NOTES fixed |
 | 18 | Definition-of-Done check and CI/CD | ✅ | `task dod` 19/19; CI pushes five public images to GHCR per commit; chart release on tags; `task demo:reset` |
-| 19 | Production rehearsal (no VPS) | ⏳ | |
+| 19 | Production rehearsal (no VPS) | ✅ | Prod values + GHCR images on a fresh single-node k3s over HTTPS: DoD 19/19; upgrade, rollback and auto-rollback drill; VPS runbook |
 | 20 | Documentation | ⏳ | |
 | 21 | Demo video | ⏳ | Owner records |
 | 22–30 | Phase 2 extras | ⏳ | Start after Task 18 passes |
@@ -116,6 +116,46 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-19 · Task 19: Production values and the production rehearsal · ✅
+
+**What was done**
+- **`values-prod.yaml` is complete:**
+  - HTTPS through cert-manager with the `letsencrypt-prod` issuer
+  - GHCR images
+  - production volume sizes and limits, log level `info`
+  - placeholders (`CHANGE-ME`) only for what's set at deploy time: the domain, image tag and Let's Encrypt email
+- **ClusterIssuers in the umbrella chart** (`templates/cluster-issuers.yaml`, off by default). `certManager.letsEncrypt` renders `letsencrypt-staging` and `letsencrypt-prod` (ACME HTTP-01 through Traefik); `certManager.selfSigned` renders `selfsigned`. cert-manager itself is a prerequisite, installed by `task cert-manager` at pinned v1.21.2 with its CRDs.
+- **`values-rehearsal.yaml`:** the whole difference between the rehearsal and production is two settings, the nip.io domain and the self-signed issuer. Images, volume sizes and limits are production's.
+- **`deploy/k3d/rehearsal.yaml`:** a single-node k3s v1.35.5 cluster, like the VPS. It has no local registry, because images come from GHCR.
+- **Tasks:**
+  - `rehearsal:up`: stops the dev cluster to save memory, creates the cluster and installs cert-manager.
+  - `rehearsal:deploy`: Secrets via `secrets.mjs`, then `helm upgrade --install` with the production and rehearsal values, `IMAGE_TAG` (default: the `origin/main` SHA) for all five images, and `--rollback-on-failure`.
+  - `rehearsal:dod`: HTTPS with `--insecure`.
+  - `rehearsal:down`: deletes the rehearsal cluster and starts the dev cluster again.
+  - `deploy:prod` (`PROD_CONTEXT`, `DOMAIN`, `LETSENCRYPT_EMAIL`, optional `ISSUER=letsencrypt-staging`) and `cert-manager`.
+- **Runbooks:** `docs/runbooks/vps.md` covers hardening, the firewall, k3s, kubectl over an SSH tunnel, DuckDNS, cert-manager, Secrets, staging-then-prod certificates, verification and manual backups. `docs/runbooks/upgrade-and-rollback.md` covers upgrades, rollbacks, migrations, the cost of a failed upgrade, and the drill.
+- **`verify:k8s`** now also checks the production-plus-rehearsal render.
+- **`docs/threat-model.md`** (Task 20) was written alongside, with every control traced to the code.
+
+**Verification**
+- Renders: production and rehearsal differ only in the domain, the issuer annotation, and which ClusterIssuers exist. `verify:k8s` passes all three renders.
+- Fresh rehearsal cluster with the images of `4da55d6` from GHCR:
+  - Install took 3m17s. Both certificates were issued in seconds, and the bootstrap seeded 4 products.
+  - Over HTTPS: storefront 200, dashboard 200, gateway 401. The sign-in cookie is `HttpOnly; Secure; SameSite=Lax`.
+- **`task rehearsal:dod`: 19 of 19 over HTTPS**, real LLM included.
+- **Drill** (details in the runbook):
+  - An upgrade changing the log level was deployed.
+  - `helm rollback` restored it, with products and users unchanged.
+  - An upgrade to a gateway image that doesn't exist failed at the 2-minute timeout and was **rolled back automatically**. The gateway answered 108 of 108 once-a-second probes throughout.
+- `rehearsal:down` deleted the cluster. The dev cluster came back with all 7 workloads ready in about 75 s.
+
+**Problems and fixes**
+1. **The first drill attempt was wrong, and instructive.** `helm upgrade -f values-prod.yaml --reuse-values` re-applied the file's placeholder tags (`CHANGE-ME-git-sha`) to every image. Both "upgrades" failed and were rolled back automatically, so this also proved `--rollback-on-failure`.
+   - It exposed a real limitation: WordPress uses `Recreate` (ReadWriteOnce volume), so a broken store image leaves the storefront down until the rollback. The other components lost nothing.
+   - The runbook now warns against combining `-f values-prod.yaml` with `--reuse-values`, and documents the WordPress cost.
+2. **On a fresh install the gateway's migrate step restarted 3 times** with `getaddrinfo ENOTFOUND postgres`. Postgres's Service is headless, so its name only resolves once the pod is ready. The restarts are harmless and expected; the migrations applied as soon as Postgres was up.
+3. **`secrets.mjs` usage comment was wrong.** It showed `--context my-vps` and `--recreate store-db`, but the parser only accepts `--key=value`. Corrected.
 
 ### 2026-10-19 · Task 18: CI image publishing, chart release and demo reset · ✅
 

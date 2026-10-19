@@ -82,6 +82,28 @@
         "configureTimeouts": { "type": "boolean" }
       }
     },
+    "certManager": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selfSigned": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string", "minLength": 1 }
+          }
+        },
+        "letsEncrypt": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "email": { "type": "string" }
+          }
+        }
+      }
+    },
     "woo-mcp": { "$ref": "#/definitions/mcpServer" },
     "fx-mcp": { "$ref": "#/definitions/mcpServer" },
     "platform": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },

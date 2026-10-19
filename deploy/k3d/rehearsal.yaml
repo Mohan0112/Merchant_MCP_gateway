@@ -1,0 +1,25 @@
+# Production rehearsal cluster (task rehearsal:up): a single k3s node like the VPS, with the same
+# k3s version as the local cluster and the VPS runbook. Images come from GHCR, as in production,
+# so it needs no local registry. It takes ports 80 and 443, so the local cluster is stopped first.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: urumi-rehearsal
+servers: 1
+agents: 0
+image: rancher/k3s:v1.35.5-k3s1
+ports:
+  - port: 80:80
+    nodeFilters:
+      - loadbalancer
+  - port: 443:443
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true
+    timeout: 180s
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    # Keep k3d-urumi as the current context; rehearsal commands name their context explicitly.
+    switchCurrentContext: false

@@ -1,0 +1,44 @@
+{{- /*
+cert-manager ClusterIssuers, referenced by the Ingresses through global.tls.clusterIssuer.
+cert-manager itself (with its CRDs) is installed separately before this chart; see
+docs/runbooks/vps.md. Production uses Let's Encrypt over HTTP-01 through Traefik; the local
+production rehearsal uses a self-signed issuer, because Let's Encrypt can't reach a laptop.
+*/}}
+{{- with .Values.certManager }}
+{{- if .selfSigned.enabled }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .selfSigned.name }}
+  labels:
+    {{- include "urumi.labels" $ | nindent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}
+{{- if .letsEncrypt.enabled }}
+{{- if not .letsEncrypt.email }}
+{{- fail "certManager.letsEncrypt.email is required: Let's Encrypt sends expiry notices there" }}
+{{- end }}
+{{- range $issuer := list (dict "name" "letsencrypt-staging" "server" "https://acme-staging-v02.api.letsencrypt.org/directory") (dict "name" "letsencrypt-prod" "server" "https://acme-v02.api.letsencrypt.org/directory") }}
+---
+# {{ $issuer.name }}: start with staging (untrusted certificates, generous rate limits), then
+# switch global.tls.clusterIssuer to letsencrypt-prod once issuance works.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $issuer.name }}
+  labels:
+    {{- include "urumi.labels" $ | nindent 4 }}
+spec:
+  acme:
+    server: {{ $issuer.server }}
+    email: {{ $.Values.certManager.letsEncrypt.email | quote }}
+    privateKeySecretRef:
+      name: {{ $issuer.name }}-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: {{ $.Values.global.ingressClassName }}
+{{- end }}
+{{- end }}
+{{- end }}

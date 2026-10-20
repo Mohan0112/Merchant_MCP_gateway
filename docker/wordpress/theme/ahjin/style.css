@@ -120,6 +120,12 @@ ul.products li.product .price { color: var(--ah-ink); font-size: 1.12rem; font-w
 ul.products li.product .price del { color: var(--ah-muted); font-weight: 500; font-size: 0.88rem; opacity: 1; margin-right: 0.4em; }
 ul.products li.product .price ins { text-decoration: none; }
 ul.products li.product .button { margin: 0 1.1rem; display: block; text-align: center; }
+/* The "View cart" link WooCommerce adds after an AJAX add-to-cart: a quiet link inside the card. */
+ul.products li.product .added_to_cart {
+  display: block; margin: 0.6em 1.1rem 0; padding: 0.3em 0; text-align: center;
+  background: none; color: var(--ah-brand); font-weight: 600;
+}
+ul.products li.product .added_to_cart:hover { background: none; color: var(--ah-brand-dark); text-decoration: underline; }
 ul.products li.product .onsale { position: absolute; top: 0.9em; left: 0.9em; margin: 0; }
 ul.products li.product { position: relative; }
 

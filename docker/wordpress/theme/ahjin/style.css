@@ -154,6 +154,11 @@ table.woocommerce-product-attributes td p { margin: 0; }
 .woocommerce-products-header__title.page-title { font-size: 2.2rem; font-weight: 800; }
 .term-description { color: var(--ah-muted); }
 .storefront-sorting { border-bottom: 1px solid var(--ah-line); margin-bottom: 1.6em; }
+.woocommerce-products-header { padding-bottom: 1.2em; }
+select.orderby {
+  border: 1px solid var(--ah-line); border-radius: 8px; padding: 0.45em 0.9em; background: var(--ah-card);
+  color: var(--ah-ink); font-weight: 600;
+}
 
 /* ---------- Footer ---------- */
 .site-footer { background: var(--ah-ink); color: #94a3b8; padding-top: 3em; }

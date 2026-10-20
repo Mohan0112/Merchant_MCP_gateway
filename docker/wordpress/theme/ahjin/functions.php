@@ -72,6 +72,16 @@ add_filter(
 	'body_class',
 	fn( $classes ) => array_merge( array_diff( $classes, array( 'right-sidebar', 'left-sidebar' ) ), array( 'storefront-full-width-content', 'ahjin' ) )
 );
+// Storefront repeats the sorting box, result count and page numbers above and below the grid.
+// Keep sorting and the count on top, and the page numbers only at the bottom.
+add_action(
+	'init',
+	function () {
+		remove_action( 'woocommerce_after_shop_loop', 'woocommerce_catalog_ordering', 10 );
+		remove_action( 'woocommerce_after_shop_loop', 'woocommerce_result_count', 20 );
+		remove_action( 'woocommerce_before_shop_loop', 'storefront_woocommerce_pagination', 30 );
+	}
+);
 add_filter( 'storefront_loop_columns', fn() => 3 );
 add_filter( 'loop_shop_per_page', fn() => 12 );
 add_filter( 'woocommerce_output_related_products_args', fn( $args ) => array_merge( $args, array( 'posts_per_page' => 3, 'columns' => 3 ) ) );

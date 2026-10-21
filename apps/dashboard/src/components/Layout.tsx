@@ -52,7 +52,7 @@ function Brand() {
     <div className="brand">
       <img src="/favicon.svg" width="30" height="30" alt="" />
       <div>
-        Urumi
+        Ahjin
         <small>Team MCP gateway</small>
       </div>
     </div>

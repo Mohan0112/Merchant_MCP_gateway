@@ -1,6 +1,6 @@
 wordpress:
   image:
-    repository: urumi-registry:5000/urumi-wordpress
+    repository: ahjin-registry:5000/ahjin-wordpress
     tag: dev
     pullPolicy: IfNotPresent
   environmentType: production

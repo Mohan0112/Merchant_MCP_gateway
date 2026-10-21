@@ -4,7 +4,7 @@
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
-  name: urumi-rehearsal
+  name: ahjin-rehearsal
 servers: 1
 agents: 0
 image: rancher/k3s:v1.35.5-k3s1
@@ -21,5 +21,5 @@ options:
     timeout: 180s
   kubeconfig:
     updateDefaultKubeconfig: true
-    # Keep k3d-urumi as the current context; rehearsal commands name their context explicitly.
+    # Keep k3d-ahjin as the current context; rehearsal commands name their context explicitly.
     switchCurrentContext: false

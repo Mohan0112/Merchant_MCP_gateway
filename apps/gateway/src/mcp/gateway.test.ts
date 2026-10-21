@@ -157,7 +157,7 @@ describe.skipIf(!databaseUrl)('MCP gateway', () => {
     const rows = await auditRows();
     expect(rows.map((r) => r.outcome)).toEqual(['not_found', 'denied_auth']);
     expect(rows[1]).toMatchObject({ user_id: team.memberId, error_message: 'API key revoked' });
-    expect(key).toMatch(/^umcp_/);
+    expect(key).toMatch(/^amcp_/);
   });
 
   it('rejects requests with a foreign Host header (DNS rebinding)', async () => {
@@ -317,7 +317,7 @@ describe.skipIf(!databaseUrl)('MCP gateway', () => {
     expect(failures.entries[0]).toMatchObject({
       serverSlug: 'alpha',
       toolName: 'fail',
-      userEmail: 'bob@urumi.test',
+      userEmail: 'bob@ahjin.test',
     });
     const adminOwn = (
       await team.admin.request('GET', `/api/audit-logs?userId=${team.memberId}&tool=echo`)

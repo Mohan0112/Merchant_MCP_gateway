@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Creates the Kubernetes Secrets the Helm chart references by name (ADR-008).
 //
-//   node scripts/secrets.mjs                         # local cluster (context k3d-urumi)
+//   node scripts/secrets.mjs                         # local cluster (context k3d-ahjin)
 //   node scripts/secrets.mjs --context=my-vps        # another cluster
 //   node scripts/secrets.mjs --recreate=fx-mcp-auth  # delete and regenerate Secrets (comma-separated)
 //
@@ -20,8 +20,8 @@ const args = Object.fromEntries(
     return [key, rest.length ? rest.join('=') : 'true'];
   }),
 );
-const context = args.context ?? 'k3d-urumi';
-const namespace = args.namespace ?? 'urumi';
+const context = args.context ?? 'k3d-ahjin';
+const namespace = args.namespace ?? 'ahjin';
 const envFile = args['env-file'] ?? '.env.local';
 const recreate = new Set((args.recreate ?? '').split(',').filter(Boolean));
 
@@ -145,7 +145,7 @@ function apply(name, stringData) {
       name,
       namespace,
       labels: {
-        'app.kubernetes.io/part-of': 'urumi',
+        'app.kubernetes.io/part-of': 'ahjin',
         'app.kubernetes.io/managed-by': 'secrets-script',
       },
     },

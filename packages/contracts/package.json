@@ -1,5 +1,5 @@
 {
-  "name": "@urumi/contracts",
+  "name": "@ahjin/contracts",
   "version": "0.1.0",
   "private": true,
   "description": "Zod schemas and types shared by the dashboard, gateway and MCP servers",

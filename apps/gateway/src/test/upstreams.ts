@@ -5,7 +5,7 @@ import {
   ToolError,
   type McpHttpServer,
   type StaticCredential,
-} from '@urumi/mcp-kit';
+} from '@ahjin/mcp-kit';
 import * as z from 'zod';
 import { bootstrapAdmin } from '../modules/auth/users';
 import { Browser, quietLogger, type Harness } from './harness';
@@ -72,14 +72,14 @@ export interface Team {
 
 /** An admin who has set their own password, and an invited member. */
 export async function createTeam(h: Harness): Promise<Team> {
-  await bootstrapAdmin(h.ctx, 'admin@urumi.test', 'initial-admin-password');
+  await bootstrapAdmin(h.ctx, 'admin@ahjin.test', 'initial-admin-password');
   const admin = new Browser(h.app);
-  await admin.login('admin@urumi.test', 'initial-admin-password');
+  await admin.login('admin@ahjin.test', 'initial-admin-password');
   await admin.request('POST', '/api/auth/password', {
     currentPassword: 'initial-admin-password',
     newPassword: 'a-new-admin-password',
   });
-  const invite = await admin.request('POST', '/api/invitations', { email: 'bob@urumi.test' });
+  const invite = await admin.request('POST', '/api/invitations', { email: 'bob@ahjin.test' });
   const token = new URL(invite.json().invitation.link).pathname.split('/').pop()!;
   const member = new Browser(h.app);
   const accepted = await member.request('POST', `/api/invitations/accept/${token}`, {

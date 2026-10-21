@@ -21,7 +21,7 @@ const args = Object.fromEntries(
     return [key, rest.length ? rest.join('=') : 'true'];
   }),
 );
-const CHART = 'charts/urumi';
+const CHART = 'charts/ahjin';
 const KUBECONFORM = 'ghcr.io/yannh/kubeconform:v0.8.0';
 const KUBERNETES_VERSION = '1.35.0';
 
@@ -40,7 +40,7 @@ const problem = (render, message) => problems.push(`[${render}] ${message}`);
 function helmTemplate(values) {
   return execFileSync(
     'helm',
-    ['template', 'urumi', CHART, '-n', 'urumi', ...values.flatMap((file) => ['-f', file])],
+    ['template', 'ahjin', CHART, '-n', 'ahjin', ...values.flatMap((file) => ['-f', file])],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
   );
 }

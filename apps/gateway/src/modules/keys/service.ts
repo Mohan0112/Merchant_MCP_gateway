@@ -4,7 +4,7 @@ import {
   type CreateApiKeyRequest,
   type CreatedApiKey,
   type Role,
-} from '@urumi/contracts';
+} from '@ahjin/contracts';
 import { and, count, desc, eq, gt, isNull, or } from 'drizzle-orm';
 import type { GatewayContext } from '../../context';
 import { apiKeys, users } from '../../db/schema';
@@ -32,7 +32,7 @@ const toDto = (row: KeyRow): ApiKey => ({
 
 /**
  * Creates a key and returns its plaintext exactly once. Members issue keys for themselves; admins
- * may issue for anyone. Format: umcp_<8-char prefix>_<43-char secret>. Only an HMAC of the whole
+ * may issue for anyone. Format: amcp_<8-char prefix>_<43-char secret>. Only an HMAC of the whole
  * key (with a server-side pepper) is stored.
  */
 export async function issueKey(
@@ -63,7 +63,7 @@ export async function issueKey(
     throw conflict(`A user can have at most ${MAX_ACTIVE_KEYS} active keys.`);
 
   const prefix = randomAlphanumeric(8);
-  const key = `umcp_${prefix}_${randomToken(32)}`;
+  const key = `amcp_${prefix}_${randomToken(32)}`;
   const [row] = await ctx.db
     .insert(apiKeys)
     .values({

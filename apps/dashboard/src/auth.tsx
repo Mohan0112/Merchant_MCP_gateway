@@ -1,4 +1,4 @@
-import type { User } from '@urumi/contracts';
+import type { User } from '@ahjin/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';

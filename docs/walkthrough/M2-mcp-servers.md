@@ -5,7 +5,7 @@
 | Piece | What it is |
 |---|---|
 | `packages/mcp-kit` | Shared foundation every MCP server we write uses: stateless MCP endpoint, credential check, Host allow-list, health endpoints, `server_info`, safe error handling |
-| `charts/urumi/charts/mcp-server` | One Helm chart for any in-cluster MCP server, used twice through aliases (`woo-mcp`, `fx-mcp`) |
+| `charts/ahjin/charts/mcp-server` | One Helm chart for any in-cluster MCP server, used twice through aliases (`woo-mcp`, `fx-mcp`) |
 | `apps/woo-mcp` | The WooCommerce MCP server we wrote: 6 store tools |
 | `apps/fx-mcp` | A currency-conversion MCP server: second upstream, kill-pod demo target |
 | GitHub remote MCP | External third upstream (Issues toolset), verified with the fine-grained token |
@@ -14,7 +14,7 @@
 
 ```text
 gateway ──HTTP, Bearer <woo token>──▶ woo-mcp :8080/mcp
-  1. Host header must be woo-mcp / woo-mcp.urumi.svc…  (else 403: DNS-rebinding guard)
+  1. Host header must be woo-mcp / woo-mcp.ahjin.svc…  (else 403: DNS-rebinding guard)
   2. Bearer token compared in constant time            (else 401)
   3. MCP SDK builds a fresh server for this request (stateless) and runs the tool
 woo-mcp ──HTTP, Basic <REST key>──▶ wordpress :8080/wp-json/wc/v3/...

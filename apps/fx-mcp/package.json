@@ -12,8 +12,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@urumi/logger": "workspace:*",
-    "@urumi/mcp-kit": "workspace:*",
+    "@ahjin/logger": "workspace:*",
+    "@ahjin/mcp-kit": "workspace:*",
     "zod": "^4.6.7"
   }
 }

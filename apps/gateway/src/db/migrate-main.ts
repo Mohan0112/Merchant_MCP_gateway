@@ -1,5 +1,5 @@
 // Entry point of the `migrate` initContainer: apply pending migrations, then exit.
-import { createLogger } from '@urumi/logger';
+import { createLogger } from '@ahjin/logger';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPool, runMigrations } from './client';

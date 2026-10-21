@@ -3,7 +3,7 @@
 //
 //   node scripts/demo-reset.mjs                  # local cluster
 //   node scripts/demo-reset.mjs --keep-orders --keep-products --keep-audit
-//   node scripts/demo-reset.mjs --context=k3d-urumi-rehearsal --scheme=https --insecure
+//   node scripts/demo-reset.mjs --context=k3d-ahjin-rehearsal --scheme=https --insecure
 //
 // What it does:
 //   1. Store: deletes every order and every product that isn't in the seeded catalogue
@@ -158,7 +158,7 @@ async function resetUsers(admin, adminId) {
   const secret = {
     apiVersion: 'v1',
     kind: 'Secret',
-    metadata: { name: 'demo-users', labels: { 'app.kubernetes.io/part-of': 'urumi' } },
+    metadata: { name: 'demo-users', labels: { 'app.kubernetes.io/part-of': 'ahjin' } },
     stringData: {
       'user-a-email': logins.A.email,
       'user-a-password': logins.A.password,

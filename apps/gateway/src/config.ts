@@ -74,9 +74,9 @@ export function mcpAllowedHosts(
   const hosts = new Set([
     new URL(config.PUBLIC_BASE_URL).hostname,
     'gateway',
-    'gateway.urumi',
-    'gateway.urumi.svc',
-    'gateway.urumi.svc.cluster.local',
+    'gateway.ahjin',
+    'gateway.ahjin.svc',
+    'gateway.ahjin.svc.cluster.local',
     '127.0.0.1',
     'localhost',
     ...config.MCP_ALLOWED_HOSTS,

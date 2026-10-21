@@ -1,4 +1,4 @@
-import type { AuditChannel, AuditOutcome } from '@urumi/contracts';
+import type { AuditChannel, AuditOutcome } from '@ahjin/contracts';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useIsAdmin } from '../auth';

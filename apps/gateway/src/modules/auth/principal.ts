@@ -1,4 +1,4 @@
-import type { Role } from '@urumi/contracts';
+import type { Role } from '@ahjin/contracts';
 import type { FastifyRequest } from 'fastify';
 import { AppError, forbidden, unauthorized } from '../../lib/errors';
 

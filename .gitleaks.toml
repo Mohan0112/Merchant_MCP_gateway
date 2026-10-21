@@ -6,10 +6,10 @@ useDefault = true
 # Gateway API keys (format defined in packages/contracts). Tests build sample keys at runtime
 # so no literal key ever appears in the repository.
 [[rules]]
-id = "urumi-gateway-api-key"
-description = "URUMI MCP gateway API key"
-regex = '''umcp_[A-Za-z0-9]{8}_[A-Za-z0-9_-]{43}'''
-keywords = ["umcp_"]
+id = "ahjin-gateway-api-key"
+description = "Ahjin MCP gateway API key"
+regex = '''amcp_[A-Za-z0-9]{8}_[A-Za-z0-9_-]{43}'''
+keywords = ["amcp_"]
 
 # Reviewed false positive. Commit 79210b3 hard-coded a dummy pepper in the gateway's test harness.
 # It was never a real secret (deployments get a random pepper in the gateway-crypto Secret from

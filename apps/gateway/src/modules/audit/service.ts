@@ -1,4 +1,4 @@
-import type { AuditChannel, AuditEntry, AuditOutcome, AuditQuery } from '@urumi/contracts';
+import type { AuditChannel, AuditEntry, AuditOutcome, AuditQuery } from '@ahjin/contracts';
 import { and, desc, eq, gte, ilike, lt, lte, type SQL } from 'drizzle-orm';
 import type { GatewayContext } from '../../context';
 import { auditLogs, users } from '../../db/schema';

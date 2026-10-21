@@ -1,4 +1,4 @@
-import type { Role, User } from '@urumi/contracts';
+import type { Role, User } from '@ahjin/contracts';
 import { and, asc, count, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { GatewayContext } from '../../context';
 import { apiKeys, users } from '../../db/schema';

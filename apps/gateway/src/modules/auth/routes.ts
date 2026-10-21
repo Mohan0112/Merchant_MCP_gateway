@@ -5,7 +5,7 @@ import {
   CreateInvitationRequestSchema,
   LoginRequestSchema,
   UpdateUserRequestSchema,
-} from '@urumi/contracts';
+} from '@ahjin/contracts';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as z from 'zod';

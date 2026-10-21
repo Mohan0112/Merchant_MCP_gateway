@@ -1,4 +1,4 @@
-import type { ChatEvent, ChatMessage } from '@urumi/contracts';
+import type { ChatEvent, ChatMessage } from '@ahjin/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';

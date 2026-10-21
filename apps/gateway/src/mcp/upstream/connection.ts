@@ -1,4 +1,4 @@
-import type { UnreachableReason, UpstreamStatus } from '@urumi/contracts';
+import type { UnreachableReason, UpstreamStatus } from '@ahjin/contracts';
 import type {
   CallToolResult,
   UpstreamClient,

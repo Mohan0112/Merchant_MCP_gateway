@@ -1,6 +1,6 @@
 gateway:
   image:
-    repository: urumi-registry:5000/urumi-gateway
+    repository: ahjin-registry:5000/ahjin-gateway
     tag: dev
     pullPolicy: IfNotPresent
   replicas: 1
@@ -18,7 +18,7 @@ gateway:
 
 dashboard:
   image:
-    repository: urumi-registry:5000/urumi-dashboard
+    repository: ahjin-registry:5000/ahjin-dashboard
     tag: dev
     pullPolicy: IfNotPresent
   replicas: 1
@@ -30,8 +30,8 @@ postgres:
   image:
     repository: postgres
     tag: 17.11-alpine
-  database: urumi
-  user: urumi
+  database: ahjin
+  user: ahjin
   resources:
     requests: { cpu: 100m, memory: 128Mi }
     limits: { cpu: 500m, memory: 512Mi }

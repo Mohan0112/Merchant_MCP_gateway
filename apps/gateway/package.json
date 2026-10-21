@@ -17,8 +17,8 @@
     "@modelcontextprotocol/fastify": "^2.0.1",
     "@modelcontextprotocol/node": "^2.1.1",
     "@modelcontextprotocol/server": "^2.3.1",
-    "@urumi/contracts": "workspace:*",
-    "@urumi/logger": "workspace:*",
+    "@ahjin/contracts": "workspace:*",
+    "@ahjin/logger": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
     "openai": "^7.34.0",
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
-    "@urumi/mcp-kit": "workspace:*",
+    "@ahjin/mcp-kit": "workspace:*",
     "drizzle-kit": "^0.31.11"
   }
 }

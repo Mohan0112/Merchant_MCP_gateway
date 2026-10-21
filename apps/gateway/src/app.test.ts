@@ -1,4 +1,4 @@
-import { createLogger } from '@urumi/logger';
+import { createLogger } from '@ahjin/logger';
 import { Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';

@@ -18,7 +18,7 @@ export function clientSnippets(gatewayUrl: string, key: string): ClientSnippet[]
       client: 'Claude Code',
       where: 'Run in a terminal',
       language: 'shell',
-      code: `claude mcp add --transport http urumi ${gatewayUrl} --header "Authorization: ${header}"`,
+      code: `claude mcp add --transport http ahjin ${gatewayUrl} --header "Authorization: ${header}"`,
     },
     {
       id: 'cursor',
@@ -26,7 +26,7 @@ export function clientSnippets(gatewayUrl: string, key: string): ClientSnippet[]
       where: '~/.cursor/mcp.json',
       language: 'json',
       code: JSON.stringify(
-        { mcpServers: { urumi: { url: gatewayUrl, headers: { Authorization: header } } } },
+        { mcpServers: { ahjin: { url: gatewayUrl, headers: { Authorization: header } } } },
         null,
         2,
       ),
@@ -38,7 +38,7 @@ export function clientSnippets(gatewayUrl: string, key: string): ClientSnippet[]
       language: 'json',
       code: JSON.stringify(
         {
-          servers: { urumi: { type: 'http', url: gatewayUrl, headers: { Authorization: header } } },
+          servers: { ahjin: { type: 'http', url: gatewayUrl, headers: { Authorization: header } } },
         },
         null,
         2,

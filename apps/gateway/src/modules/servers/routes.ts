@@ -2,7 +2,7 @@ import {
   CreateServerRequestSchema,
   TestConnectionRequestSchema,
   UpdateServerRequestSchema,
-} from '@urumi/contracts';
+} from '@ahjin/contracts';
 import type { FastifyInstance } from 'fastify';
 import * as z from 'zod';
 import { parse } from '../../lib/http';

@@ -11,7 +11,7 @@ The WooCommerce MCP server must read and write products and orders. The brief as
 
 - Use the **WooCommerce REST API v3** as a dedicated WordPress user `mcp-bot` with the **`shop_manager`** role (products and orders, but no plugins, users or settings).
 - Authenticate with **HTTP Basic Auth** using a REST key generated from a Kubernetes Secret. The bootstrap Job stores the key with WooCommerce's own `wc_api_hash()`.
-- Bake a must-use plugin `urumi-internal-https.php` into the store image. It sets `$_SERVER['HTTPS'] = 'on'` **only when the request's `Host` header equals `URUMI_INTERNAL_HOST`** (the in-cluster Service name).
+- Bake a must-use plugin `ahjin-internal-https.php` into the store image. It sets `$_SERVER['HTTPS'] = 'on'` **only when the request's `Host` header equals `AHJIN_INTERNAL_HOST`** (the in-cluster Service name).
 - `woo-mcp` rewrites store URLs in responses to the public store URL. WordPress emits `https://` URLs on internal requests because of the plugin.
 
 ## Consequences

@@ -6,7 +6,7 @@
 {{- define "mcp-server.labels" -}}
 app.kubernetes.io/name: {{ include "mcp-server.name" . }}
 app.kubernetes.io/component: mcp-server
-app.kubernetes.io/part-of: urumi
+app.kubernetes.io/part-of: ahjin
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "mcp-server-%s" .Chart.Version }}

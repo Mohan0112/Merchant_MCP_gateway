@@ -9,16 +9,16 @@ The dashboard is a React 19 single-page app, built by Vite and served as static 
 | File | What it does |
 |---|---|
 | [`main.tsx`](../../apps/dashboard/src/main.tsx), [`auth.tsx`](../../apps/dashboard/src/auth.tsx), [`pages/AuthPages.tsx`](../../apps/dashboard/src/pages/AuthPages.tsx) | Routes and the query client (a 401 anywhere means signed out); `RequireUser` puts a forced password change first, `RequireAdmin` guards Members; sign-in, invitation and password pages; the chat page loads lazily |
-| [`lib/api.ts`](../../apps/dashboard/src/lib/api.ts) | Typed same-origin client using types from `@urumi/contracts`: `X-Requested-With` on writes; problem+json becomes an `ApiError` whose field errors appear under form inputs |
+| [`lib/api.ts`](../../apps/dashboard/src/lib/api.ts) | Typed same-origin client using types from `@ahjin/contracts`: `X-Requested-With` on writes; problem+json becomes an `ApiError` whose field errors appear under form inputs |
 | [`components/Layout.tsx`](../../apps/dashboard/src/components/Layout.tsx), [`components/ui.tsx`](../../apps/dashboard/src/components/ui.tsx) | Shell with a role-aware sidebar; a small kit (modal, badges, switch, copyable code block) on plain CSS that follows the OS light or dark theme |
 | [`pages/ServersPage.tsx`](../../apps/dashboard/src/pages/ServersPage.tsx) | Cards with status and reason, polled every 5 s; tool list; add and edit with "Test connection"; enable switch; remove |
 | [`pages/MembersPage.tsx`](../../apps/dashboard/src/pages/MembersPage.tsx), [`pages/KeysPage.tsx`](../../apps/dashboard/src/pages/KeysPage.tsx), [`lib/snippets.ts`](../../apps/dashboard/src/lib/snippets.ts) | Admins: invitation links, roles, disable, a member's keys. Everyone: the gateway URL, a new key shown once with snippets for Claude Code, Cursor, VS Code and MCP Inspector, revoke |
 | [`pages/AuditPage.tsx`](../../apps/dashboard/src/pages/AuditPage.tsx) | Filters (user for admins, server, tool, outcome, channel), "Load older entries" paging, refresh every 10 s |
 | [`pages/ChatPage.tsx`](../../apps/dashboard/src/pages/ChatPage.tsx), [`lib/sse.ts`](../../apps/dashboard/src/lib/sse.ts) | Chat: a POST whose streamed response is parsed into events, a card per tool call, Markdown answer, Stop, New chat |
-| [`docker/dashboard/`](../../docker/dashboard/), [`dashboard.yaml`](../../charts/urumi/charts/platform/templates/dashboard.yaml), [`ingress.yaml`](../../charts/urumi/charts/platform/templates/ingress.yaml) | nginx config (SPA fallback, cache headers, CSP and other security headers); Deployment as uid 101 with a read-only root filesystem; `/api` and `/mcp` to the gateway, the rest to the dashboard |
+| [`docker/dashboard/`](../../docker/dashboard/), [`dashboard.yaml`](../../charts/ahjin/charts/platform/templates/dashboard.yaml), [`ingress.yaml`](../../charts/ahjin/charts/platform/templates/ingress.yaml) | nginx config (SPA fallback, cache headers, CSP and other security headers); Deployment as uid 101 with a read-only root filesystem; `/api` and `/mcp` to the gateway, the rest to the dashboard |
 | [`chat/routes.ts`](../../apps/gateway/src/modules/chat/routes.ts) | `POST /api/chat`: SSE headers, a chat token for the signed-in user, run the agent, abort on disconnect, revoke the token |
 | [`chat/agent.ts`](../../apps/gateway/src/modules/chat/agent.ts) | The tool loop: MCP client of `/mcp`, system prompt, at most 8 rounds and no new round after 120 s, a round's tool calls in parallel, results capped at 16,000 characters |
-| [`chat/llm.ts`](../../apps/gateway/src/modules/chat/llm.ts), [`chat/tokens.ts`](../../apps/gateway/src/modules/chat/tokens.ts) | One OpenAI-compatible adapter (Groq, Gemini) behind `FallbackProvider`, plus `ScriptedProvider` for tests; `uchat_` tokens kept in memory, as SHA-256 hashes, for 5 minutes |
+| [`chat/llm.ts`](../../apps/gateway/src/modules/chat/llm.ts), [`chat/tokens.ts`](../../apps/gateway/src/modules/chat/tokens.ts) | One OpenAI-compatible adapter (Groq, Gemini) behind `FallbackProvider`, plus `ScriptedProvider` for tests; `achat_` tokens kept in memory, as SHA-256 hashes, for 5 minutes |
 | [`mcp/endpoint.ts`](../../apps/gateway/src/mcp/endpoint.ts) | `authenticate()` accepts a chat token only while its user is active and its dashboard session still exists |
 | [`chat.test.ts`](../../apps/gateway/src/modules/chat/chat.test.ts), [`lib.test.ts`](../../apps/dashboard/src/lib/lib.test.ts) | A scripted model drives the real loop over real HTTP and the audit row is checked; SSE parser, formatting, client snippets |
 
@@ -28,7 +28,7 @@ The dashboard is a React 19 single-page app, built by Vite and served as static 
 
 ```text
 ChatPage.send  last 20 messages + the question → POST /api/chat with cookie and X-Requested-With
-routes.ts      requireUser → ChatRequestSchema → text/event-stream → uchat_ token for this user and session
+routes.ts      requireUser → ChatRequestSchema → text/event-stream → achat_ token for this user and session
 agent.ts       MCP client → http://127.0.0.1:8080/mcp with the token → tools/list (fresh every turn)
 endpoint.ts      token unexpired, user active, session still in the DB → principal, channel chat_agent
 agent.ts       tools become function schemas → provider.complete(): Groq, or Gemini if Groq fails
@@ -40,7 +40,7 @@ ChatPage       each event updates the turn: tool cards, Markdown answer, "groq �
 ```
 
 2. **Stop, or the user leaves the page.** The browser aborts the fetch. The gateway notices through the response's `close` event and aborts the model request; a tool call already running finishes and is audited, but no new round starts, and `finally` revokes the token. Listening on the request's `close` was a real bug: Node fires it as soon as the body has been read, which emptied the chat behind Traefik, so a test now streams over real HTTP.
-3. **A member creates a key and connects Claude Code.** `POST /api/api-keys` stores only the HMAC and returns the plaintext once, with `Cache-Control: no-store`. `NewKeyModal` shows it with snippets built from `window.location.origin + '/mcp'`, such as `claude mcp add --transport http urumi <url> --header "Authorization: Bearer <key>"`; nothing about the upstreams goes into the client.
+3. **A member creates a key and connects Claude Code.** `POST /api/api-keys` stores only the HMAC and returns the plaintext once, with `Cache-Control: no-store`. `NewKeyModal` shows it with snippets built from `window.location.origin + '/mcp'`, such as `claude mcp add --transport http ahjin <url> --header "Authorization: Bearer <key>"`; nothing about the upstreams goes into the client.
 4. **Sign-in and route guards.** `POST /api/auth/login` sets the httpOnly cookie, and `useMe()` reads `GET /api/auth/me`. `RequireUser` sends a user who must change their password to `/change-password`, and the gateway answers 403 `password_change_required` on every other route anyway. A 401 from any call clears `me`, and the router returns the user to `/login`.
 
 ## Design decisions, one line each
@@ -55,7 +55,7 @@ ChatPage       each event updates the turn: tool cards, Markdown answer, "groq �
 ## Likely questions and short answers
 
 **How does the chat agent act as the logged-in user?**
-`POST /api/chat` needs the session cookie. The gateway issues a random `uchat_` token mapped to that user and session, kept only in memory for at most 5 minutes and revoked when the turn ends, and the agent calls `http://127.0.0.1:8080/mcp` with it. `/mcp` accepts it only while the user is active and the session exists, so every call goes through `invokeTool()` and is audited under that user with channel `chat_agent` (the chat test checks the row). If the user signs out mid-answer, the next tool call gets 401.
+`POST /api/chat` needs the session cookie. The gateway issues a random `achat_` token mapped to that user and session, kept only in memory for at most 5 minutes and revoked when the turn ends, and the agent calls `http://127.0.0.1:8080/mcp` with it. `/mcp` accepts it only while the user is active and the session exists, so every call goes through `invokeTool()` and is audited under that user with channel `chat_agent` (the chat test checks the row). If the user signs out mid-answer, the next tool call gets 401.
 
 **Why go through `/mcp` instead of calling `invokeTool()` or the upstreams directly?**
 One path means one set of checks: the chat sees exactly what the user's own MCP client sees, Phase 2 tool permissions will apply to it with no extra code, and the brief says nothing but the gateway talks to upstreams. The cost is a loopback HTTP hop and an MCP handshake per turn.

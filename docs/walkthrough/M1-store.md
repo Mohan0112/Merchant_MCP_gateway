@@ -19,7 +19,7 @@
 
 ## What the bootstrap does, and why it's safe to re-run
 
-It runs after every `helm install`/`upgrade` and checks before every step ("is WordPress installed?", "does product URUMI-MUG exist?"). Three WooCommerce defaults would otherwise break the brief's checkout test: **"Coming soon" mode** (hides the shop), **no shipping methods** (blocks checkout), and **no `.htaccess`** (pretty URLs 404). The bootstrap fixes the first two; the image ships the third.
+It runs after every `helm install`/`upgrade` and checks before every step ("is WordPress installed?", "does product AHJIN-MUG exist?"). Three WooCommerce defaults would otherwise break the brief's checkout test: **"Coming soon" mode** (hides the shop), **no shipping methods** (blocks checkout), and **no `.htaccess`** (pretty URLs 404). The bootstrap fixes the first two; the image ships the third.
 
 It also creates the **`mcp-bot`** user as a `shop_manager`, not an admin, and gives it a REST key from a Kubernetes Secret. The WooCommerce MCP server (next milestone) uses that key.
 

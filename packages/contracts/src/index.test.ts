@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { apiKeyPrefix, SlugSchema } from './index';
 
 // Built at runtime so no literal key exists in the repo for gitleaks to flag.
-const sampleKey = (prefix: string, secret: string) => ['umcp', prefix, secret].join('_');
+const sampleKey = (prefix: string, secret: string) => ['amcp', prefix, secret].join('_');
 
 describe('SlugSchema', () => {
   it.each(['woo', 'fx', 'github', 'store-acme', 'a1'])('accepts %s', (slug) => {

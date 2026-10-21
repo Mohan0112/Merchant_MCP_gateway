@@ -12,7 +12,7 @@ Three throwaway experiments, run before building on these integrations so that r
 
 ## Spike A: WooCommerce REST authentication from inside the cluster
 
-**Setup.** Docker network with `mariadb:11.4` and `wordpress:7.1.3-php8.4-apache`. WP-CLI (`wordpress:cli-php8.4`) installed WordPress and WooCommerce 11.2.1, and created a `shop_manager` user `mcp-bot`. A REST key was inserted for that user, hashed with WooCommerce's own `wc_api_hash()`. The mu-plugin `urumi-internal-https.php` sets `$_SERVER['HTTPS'] = 'on'` only when the `Host` header equals the env var `URUMI_INTERNAL_HOST` (the in-cluster Service name). A `curl` container called the API by the internal host name.
+**Setup.** Docker network with `mariadb:11.4` and `wordpress:7.1.3-php8.4-apache`. WP-CLI (`wordpress:cli-php8.4`) installed WordPress and WooCommerce 11.2.1, and created a `shop_manager` user `mcp-bot`. A REST key was inserted for that user, hashed with WooCommerce's own `wc_api_hash()`. The mu-plugin `ahjin-internal-https.php` sets `$_SERVER['HTTPS'] = 'on'` only when the `Host` header equals the env var `AHJIN_INTERNAL_HOST` (the in-cluster Service name). A `curl` container called the API by the internal host name.
 
 | Test | Expected | Result |
 |---|---|---|

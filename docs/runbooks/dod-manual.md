@@ -36,8 +36,8 @@ Use three browser profiles (or one normal and two private windows): **Admin** (y
 1. Sign in as User B → **API keys** → **New key** → name `Claude Code` → **Create key**. Copy the key; it's shown once. The dialog has ready-made settings per client.
 2. In a terminal:
    ```sh
-   claude mcp add --transport http urumi http://app.127.0.0.1.nip.io/mcp --header "Authorization: Bearer <B's key>"
-   claude                       # then: /mcp  → urumi connected, 21 tools
+   claude mcp add --transport http ahjin http://app.127.0.0.1.nip.io/mcp --header "Authorization: Bearer <B's key>"
+   claude                       # then: /mcp  → ahjin connected, 21 tools
    ```
    (Or MCP Inspector: `npx @modelcontextprotocol/inspector`, Streamable HTTP, URL `http://app.127.0.0.1.nip.io/mcp`, header `Authorization: Bearer <key>`, **List Tools**.)
 3. Ask Claude Code: `What orders came in today?`: it uses `woo__list_orders` and finds both orders.
@@ -49,7 +49,7 @@ Use three browser profiles (or one normal and two private windows): **Admin** (y
 2. **Disable:** as Admin, switch **fx** off on its card. Its tools disappear: User A asks `Convert 100 USD to INR` and the agent has no fx tool; a client with a valid key no longer lists `fx__…` (Claude Code updates via `list_changed`; in Inspector click **List Tools**). Switch it back on.
 3. **Kill:** stop the fx server and keep it down:
    ```sh
-   kubectl -n urumi scale deployment fx-mcp --replicas=0
+   kubectl -n ahjin scale deployment fx-mcp --replicas=0
    ```
    Within about 20 s the **fx** card shows **Unreachable · Connection refused**, and `woo__…` tools keep working (ask the orders question again). Bring it back with `--replicas=1`; it reconnects by itself. (Deleting the pod instead works too, but the Deployment replaces it within seconds.)
 4. **Audit log:** as Admin, **Audit log** lists every call above: User A's with **Via** `chat_agent`, User B's with `mcp_client`, including the rejected call after revocation (`denied_auth`), the call to the disabled server (`rejected_disabled`) and to the dead one (`upstream_unreachable` or `timeout`). As User B, the audit log shows only B's own calls.

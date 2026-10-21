@@ -6,7 +6,7 @@ import type {
   ToolInfo,
   UpdateServerRequest,
   UpstreamStatus,
-} from '@urumi/contracts';
+} from '@ahjin/contracts';
 import { asc, count, eq } from 'drizzle-orm';
 import type { GatewayContext } from '../../context';
 import { upstreamServers, upstreamTools } from '../../db/schema';

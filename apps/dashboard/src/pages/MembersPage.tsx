@@ -1,4 +1,4 @@
-import type { CreatedApiKey, Role, User } from '@urumi/contracts';
+import type { CreatedApiKey, Role, User } from '@ahjin/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useMe } from '../auth';

@@ -50,7 +50,7 @@ store:
 woo-mcp:
   enabled: true
   image:
-    repository: urumi-registry:5000/urumi-woo-mcp
+    repository: ahjin-registry:5000/ahjin-woo-mcp
     tag: dev
   env:
     WOO_BASE_URL: http://wordpress:8080
@@ -67,7 +67,7 @@ woo-mcp:
 fx-mcp:
   enabled: true
   image:
-    repository: urumi-registry:5000/urumi-fx-mcp
+    repository: ahjin-registry:5000/ahjin-fx-mcp
     tag: dev
   secretEnv:
     FX_API_KEY: { secret: fx-mcp-auth, key: api-key }

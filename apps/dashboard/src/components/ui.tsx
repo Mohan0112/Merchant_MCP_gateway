@@ -1,4 +1,4 @@
-import type { UpstreamStatus } from '@urumi/contracts';
+import type { UpstreamStatus } from '@ahjin/contracts';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApiError } from '../lib/api';
 

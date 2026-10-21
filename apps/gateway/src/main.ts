@@ -1,4 +1,4 @@
-import { createLogger } from '@urumi/logger';
+import { createLogger } from '@ahjin/logger';
 import { buildApp } from './app';
 import { createGatewayModules, shutdown } from './compose';
 import { loadConfig, mcpAllowedHosts, type Config } from './config';

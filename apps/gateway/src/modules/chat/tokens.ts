@@ -20,7 +20,7 @@ export class ChatTokenStore {
 
   issue(userId: string, sessionId: string): string {
     this.prune();
-    const token = `uchat_${randomToken(32)}`;
+    const token = `achat_${randomToken(32)}`;
     this.tokens.set(sha256(token), { userId, sessionId, expiresAt: this.now().getTime() + TTL_MS });
     return token;
   }

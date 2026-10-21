@@ -1,4 +1,4 @@
-import type { ApiKey, CreatedApiKey, User } from '@urumi/contracts';
+import type { ApiKey, CreatedApiKey, User } from '@ahjin/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useMe } from '../auth';
@@ -59,7 +59,7 @@ export function KeyTable({ userId }: { userId?: string }) {
                 return (
                   <tr key={key.id}>
                     <td style={{ fontWeight: 600 }}>{key.name}</td>
-                    <td className="mono">umcp_{key.prefix}_…</td>
+                    <td className="mono">amcp_{key.prefix}_…</td>
                     <td title={dateTime(key.createdAt)}>{timeAgo(key.createdAt)}</td>
                     <td title={dateTime(key.lastUsedAt)}>{timeAgo(key.lastUsedAt)}</td>
                     <td>

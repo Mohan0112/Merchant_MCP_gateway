@@ -3,7 +3,7 @@
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
-  name: urumi
+  name: ahjin
 servers: 1
 agents: 1
 image: rancher/k3s:v1.35.5-k3s1
@@ -16,10 +16,10 @@ ports:
     nodeFilters:
       - loadbalancer
 registries:
-  # Local image registry. Push to localhost:5001/<image>; pods pull urumi-registry:5000/<image>
+  # Local image registry. Push to localhost:5001/<image>; pods pull ahjin-registry:5000/<image>
   # (k3d writes the matching mirror into each node's /etc/rancher/k3s/registries.yaml).
   create:
-    name: urumi-registry
+    name: ahjin-registry
     host: 0.0.0.0
     hostPort: '5001'
 options:

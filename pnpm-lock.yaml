@@ -208,7 +208,7 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.104.3
         version: 5.104.3(react@19.3.1)
-      '@urumi/contracts':
+      '@ahjin/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       react:
@@ -242,10 +242,10 @@ importers:
 
   apps/fx-mcp:
     dependencies:
-      '@urumi/logger':
+      '@ahjin/logger':
         specifier: workspace:*
         version: link:../../packages/logger
-      '@urumi/mcp-kit':
+      '@ahjin/mcp-kit':
         specifier: workspace:*
         version: link:../../packages/mcp-kit
       zod:
@@ -269,10 +269,10 @@ importers:
       '@modelcontextprotocol/server':
         specifier: ^2.3.1
         version: 2.3.1
-      '@urumi/contracts':
+      '@ahjin/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@urumi/logger':
+      '@ahjin/logger':
         specifier: workspace:*
         version: link:../../packages/logger
       drizzle-orm:
@@ -294,7 +294,7 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
-      '@urumi/mcp-kit':
+      '@ahjin/mcp-kit':
         specifier: workspace:*
         version: link:../../packages/mcp-kit
       drizzle-kit:
@@ -303,10 +303,10 @@ importers:
 
   apps/woo-mcp:
     dependencies:
-      '@urumi/logger':
+      '@ahjin/logger':
         specifier: workspace:*
         version: link:../../packages/logger
-      '@urumi/mcp-kit':
+      '@ahjin/mcp-kit':
         specifier: workspace:*
         version: link:../../packages/mcp-kit
       zod:
@@ -336,7 +336,7 @@ importers:
       '@modelcontextprotocol/server':
         specifier: ^2.3.1
         version: 2.3.1
-      '@urumi/logger':
+      '@ahjin/logger':
         specifier: workspace:*
         version: link:../logger
       fastify:

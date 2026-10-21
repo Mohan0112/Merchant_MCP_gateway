@@ -30,7 +30,7 @@ spec:
             - name: wp-cron
               image: "{{ .Values.wordpress.image.repository }}:{{ .Values.wordpress.image.tag }}"
               imagePullPolicy: {{ .Values.wordpress.image.pullPolicy }}
-              command: [urumi-bootstrap, cron]
+              command: [ahjin-bootstrap, cron]
               env:
                 {{- include "store.wordpressEnv" . | nindent 16 }}
               # Scheduled tasks write to uploads too (WooCommerce logs, generated files).

@@ -19,18 +19,18 @@ Dashboard → **Servers**: the card shows the reason and since when; click it fo
 ## 2. Check the server (in-cluster: woo-mcp, fx-mcp)
 
 ```sh
-kubectl -n urumi get pods -l app.kubernetes.io/name=fx-mcp           # Running and 1/1?
-kubectl -n urumi describe pod -l app.kubernetes.io/name=fx-mcp       # events: image pulls, probes, OOMKilled
-kubectl -n urumi logs deploy/fx-mcp --tail=50
-kubectl -n urumi get deploy fx-mcp                                   # replicas 0? (task dod scales it to 0 and back)
+kubectl -n ahjin get pods -l app.kubernetes.io/name=fx-mcp           # Running and 1/1?
+kubectl -n ahjin describe pod -l app.kubernetes.io/name=fx-mcp       # events: image pulls, probes, OOMKilled
+kubectl -n ahjin logs deploy/fx-mcp --tail=50
+kubectl -n ahjin get deploy fx-mcp                                   # replicas 0? (task dod scales it to 0 and back)
 ```
 
 **NetworkPolicy:** only pods labelled `app.kubernetes.io/name=gateway` may reach the MCP servers. Probe the path the gateway uses with a throwaway pod carrying that label:
 
 ```sh
-kubectl -n urumi run np-test --image=busybox:1.37.0 --labels=app.kubernetes.io/name=gateway --restart=Never -- sleep 300
-kubectl -n urumi exec np-test -- nc -z -w 3 fx-mcp 8080 && echo reachable
-kubectl -n urumi delete pod np-test
+kubectl -n ahjin run np-test --image=busybox:1.37.0 --labels=app.kubernetes.io/name=gateway --restart=Never -- sleep 300
+kubectl -n ahjin exec np-test -- nc -z -w 3 fx-mcp 8080 && echo reachable
+kubectl -n ahjin delete pod np-test
 ```
 
 Wait a few seconds after the pod starts before testing: k3s admits a new pod through the policies a moment after it starts.

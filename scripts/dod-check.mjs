@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // End-to-end check of the brief's definition of done, against a running cluster.
 //
-//   node scripts/dod-check.mjs                 # local cluster (k3d-urumi, *.127.0.0.1.nip.io)
+//   node scripts/dod-check.mjs                 # local cluster (k3d-ahjin, *.127.0.0.1.nip.io)
 //   node scripts/dod-check.mjs --skip-chat     # without the steps that need the LLM
 //   node scripts/dod-check.mjs --keep          # keep the temporary users, audit rows and store data
 //   node scripts/dod-check.mjs --domain=example.com --scheme=https --context=my-vps

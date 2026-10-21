@@ -3,16 +3,16 @@ version: '3'
 # Entry point for every developer workflow. Run `task --list` to see what's available.
 
 vars:
-  CLUSTER: urumi
-  CONTEXT: k3d-urumi
-  NAMESPACE: urumi
-  RELEASE: urumi
-  CHART: charts/urumi
+  CLUSTER: ahjin
+  CONTEXT: k3d-ahjin
+  NAMESPACE: ahjin
+  RELEASE: ahjin
+  CHART: charts/ahjin
   REGISTRY: localhost:5001
   TAG: dev
   # Production rehearsal and VPS
-  REHEARSAL_CLUSTER: urumi-rehearsal
-  REHEARSAL_CONTEXT: k3d-urumi-rehearsal
+  REHEARSAL_CLUSTER: ahjin-rehearsal
+  REHEARSAL_CONTEXT: k3d-ahjin-rehearsal
   CERT_MANAGER_VERSION: v1.21.2
   # Images CI pushed to GHCR for this commit (override: task rehearsal:deploy IMAGE_TAG=<sha>).
   IMAGE_TAG:
@@ -86,20 +86,20 @@ tasks:
     requires:
       vars: [APP]
     cmds:
-      - docker build -f docker/node-app/Dockerfile --build-arg APP={{.APP}} -t {{.REGISTRY}}/urumi-{{.APP}}:{{.TAG}} .
-      - docker push {{.REGISTRY}}/urumi-{{.APP}}:{{.TAG}}
+      - docker build -f docker/node-app/Dockerfile --build-arg APP={{.APP}} -t {{.REGISTRY}}/ahjin-{{.APP}}:{{.TAG}} .
+      - docker push {{.REGISTRY}}/ahjin-{{.APP}}:{{.TAG}}
 
   image:dashboard:
     desc: Build and push the dashboard image (static React build served by nginx)
     cmds:
-      - docker build -f docker/dashboard/Dockerfile -t {{.REGISTRY}}/urumi-dashboard:{{.TAG}} .
-      - docker push {{.REGISTRY}}/urumi-dashboard:{{.TAG}}
+      - docker build -f docker/dashboard/Dockerfile -t {{.REGISTRY}}/ahjin-dashboard:{{.TAG}} .
+      - docker push {{.REGISTRY}}/ahjin-dashboard:{{.TAG}}
 
   image:wordpress:
     desc: Build and push the WordPress + WooCommerce store image
     cmds:
-      - docker build -t {{.REGISTRY}}/urumi-wordpress:{{.TAG}} docker/wordpress
-      - docker push {{.REGISTRY}}/urumi-wordpress:{{.TAG}}
+      - docker build -t {{.REGISTRY}}/ahjin-wordpress:{{.TAG}} docker/wordpress
+      - docker push {{.REGISTRY}}/ahjin-wordpress:{{.TAG}}
 
   # ---------- Secrets ----------
 

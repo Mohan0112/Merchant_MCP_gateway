@@ -1,4 +1,4 @@
-import type { ChatEvent } from '@urumi/contracts';
+import type { ChatEvent } from '@ahjin/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHarness, databaseUrl, eventually, type Harness } from '../../test/harness';
 import { createTeam, startUpstream, type Team, type TestUpstream } from '../../test/upstreams';

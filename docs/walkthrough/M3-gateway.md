@@ -27,7 +27,7 @@
 1. **An MCP client calls `woo__list_orders`:**
 
 ```text
-client ──POST app.<domain>/mcp, Bearer umcp_…──▶ Traefik ──▶ gateway:8080
+client ──POST app.<domain>/mcp, Bearer amcp_…──▶ Traefik ──▶ gateway:8080
 endpoint.ts    hostHeaderValidation   Host not on the allow-list → 403 (DNS-rebinding guard)
                authenticate           verifyApiKey: prefix lookup, HMAC compare, revoked / expired / user disabled?
                                       no → 401 + WWW-Authenticate, and a denied_auth row if the owner is known

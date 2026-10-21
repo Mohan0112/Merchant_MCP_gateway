@@ -12,7 +12,7 @@ The brief asks for stable URLs through Ingress and a documented local domain app
 | `http://app.127.0.0.1.nip.io/` | Dashboard |
 | `http://app.127.0.0.1.nip.io/api`, `/mcp` | Gateway REST API and MCP endpoint |
 
-The domain comes from `global.domain` in `charts/urumi/values-local.yaml`; every Ingress host is built from it.
+The domain comes from `global.domain` in `charts/ahjin/values-local.yaml`; every Ingress host is built from it.
 
 ```text
 browser / MCP client
@@ -25,9 +25,9 @@ laptop port 80  →  k3d load balancer  →  Traefik (kube-system)  →  Service
 
 1. Open Notepad **as administrator** and edit `C:\Windows\System32\drivers\etc\hosts`. Add:
    ```text
-   127.0.0.1 store.urumi.test app.urumi.test
+   127.0.0.1 store.ahjin.test app.ahjin.test
    ```
-2. Deploy with `--set global.domain=urumi.test`.
+2. Deploy with `--set global.domain=ahjin.test`.
 
 ## Port conflicts
 

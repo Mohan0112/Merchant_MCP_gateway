@@ -12,7 +12,7 @@ const ConfigSchema = z.object({
   WOO_MCP_TOKEN: z.string().min(16),
   /** Comma-separated Host names accepted on /mcp (the chart sets every form of the Service name). */
   MCP_ALLOWED_HOSTS: z.string().min(1).transform(list),
-  /** In-cluster WordPress URL; its host must equal the store's URUMI_INTERNAL_HOST (ADR-0002). */
+  /** In-cluster WordPress URL; its host must equal the store's AHJIN_INTERNAL_HOST (ADR-0002). */
   WOO_BASE_URL: z.url().default('http://wordpress:8080'),
   /** REST key of the mcp-bot shop_manager user (Secret store-woo-api). */
   WOO_CONSUMER_KEY: z.string().startsWith('ck_'),

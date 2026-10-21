@@ -1,4 +1,4 @@
-import type { ChatEvent } from '@urumi/contracts';
+import type { ChatEvent } from '@ahjin/contracts';
 
 /**
  * Incremental parser for the chat's server-sent events. Feed it chunks as they arrive; it returns

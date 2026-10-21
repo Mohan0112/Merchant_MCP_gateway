@@ -23,8 +23,8 @@ export function parseOptions(argv = process.argv.slice(2)) {
   }
   return {
     args,
-    context: args.context ?? 'k3d-urumi',
-    namespace: args.namespace ?? 'urumi',
+    context: args.context ?? 'k3d-ahjin',
+    namespace: args.namespace ?? 'ahjin',
     app: `${scheme}://app.${domain}`,
     store: `${scheme}://store.${domain}`,
   };
@@ -47,9 +47,9 @@ export function clusterTools({ context, namespace }) {
         '--',
         'psql',
         '-U',
-        'urumi',
+        'ahjin',
         '-d',
-        'urumi',
+        'ahjin',
         '-v',
         'ON_ERROR_STOP=1',
         '-At',

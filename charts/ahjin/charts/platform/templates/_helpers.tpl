@@ -3,7 +3,7 @@
 {{- $root := index . 0 -}}
 app.kubernetes.io/name: {{ index . 1 }}
 app.kubernetes.io/component: platform
-app.kubernetes.io/part-of: urumi
+app.kubernetes.io/part-of: ahjin
 app.kubernetes.io/instance: {{ $root.Release.Name }}
 app.kubernetes.io/managed-by: {{ $root.Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" $root.Chart.Name $root.Chart.Version | replace "+" "_" }}

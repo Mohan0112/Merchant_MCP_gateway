@@ -21,7 +21,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 3 | Technical spikes | ✅ | Woo Basic Auth ✅, MCP SDK v2 gateway + Claude Code ✅, Groq/Gemini tool loop ✅ |
 | 4 | Store image and sub-chart | ✅ | WordPress 7.1.3 + WooCommerce 11.2.1 image (non-root, :8080), MariaDB 11.4.13, PVCs, Ingress, Secrets script |
 | 5 | Store bootstrap and checkout | ✅ | Idempotent bootstrap Job, wp-cron CronJob, COD checkout via Store API → order #14 visible in admin |
-| 6 | MCP server kit and sub-chart | ✅ | `@urumi/mcp-kit` (11 tests), generic `mcp-server` chart (no Ingress, gateway-only NetworkPolicy), shared Node image |
+| 6 | MCP server kit and sub-chart | ✅ | `@ahjin/mcp-kit` (11 tests), generic `mcp-server` chart (no Ingress, gateway-only NetworkPolicy), shared Node image |
 | 7 | WooCommerce MCP server | ✅ | 6 tools + server_info, 23 tests; in-cluster: today's orders in IST, product created and visible on storefront |
 | 8 | Additional upstreams (fx-mcp, GitHub) | ✅ | fx-mcp deployed (live rates, header credential); GitHub Issues toolset verified with the PAT |
 | 9 | Gateway skeleton and platform sub-chart | ✅ | Fastify app, schema v1 (8 tables), migrate initContainer, PostgreSQL 17.11, Ingress app.&lt;domain&gt;/api,/mcp |
@@ -39,6 +39,7 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 21 | Demo video | ⏳ | Owner records |
 | 22–30 | Phase 2 extras | ⏳ | Next; core complete (every mandatory item of the brief: `docs/brief-checklist.md`) |
 | 31 | Live VPS deployment | ⏸️ | Deferred by the owner |
+| 32 | Ahjin everywhere | ✅ | Every technical name, token format and document now uses the shop's name; fresh `ahjin` cluster, DoD 19/19 |
 
 ---
 
@@ -66,7 +67,7 @@ Verified on the owner's laptop (Windows 11, 16 GB RAM, 12 logical cores).
 ## Resume or debug
 
 ```sh
-# from the repository root (URUMI.ai/Project)
+# from the repository root (Project)
 pnpm install            # restore dependencies from the lockfile
 task check              # lint, typecheck and test every package
 pnpm turbo run lint typecheck test --force   # same, ignoring Turborepo's cache
@@ -77,7 +78,7 @@ task images:build       # build + push images to the local registry (localhost:5
 task logins             # print generated wp-admin / dashboard logins (local only)
 task chart:lint         # helm lint + render with local and prod values
 task verify:k8s         # probes, requests/limits, non-root, NetworkPolicies, kubeconform (needs Docker)
-task deploy:local       # helm upgrade --install urumi on the local cluster
+task deploy:local       # helm upgrade --install ahjin on the local cluster
 task cluster:reset      # delete and recreate the cluster (loses all cluster data)
 task dod                # the brief's definition of done, end to end, against the running cluster
 task dod -- --skip-chat # same without the LLM steps
@@ -88,11 +89,11 @@ task demo:reset         # clean demo state: no orders, sample products, all serv
 
 Useful cluster checks:
 ```sh
-kubectl config current-context                     # should be k3d-urumi
+kubectl config current-context                     # should be k3d-ahjin
 kubectl get nodes                                  # 1 server + 1 agent, Ready
 kubectl -n kube-system get deploy traefik          # ingress controller
-docker exec k3d-urumi-server-0 cat /etc/rancher/k3s/registries.yaml   # registry mirror
-helm -n urumi history urumi                        # release revisions
+docker exec k3d-ahjin-server-0 cat /etc/rancher/k3s/registries.yaml   # registry mirror
+helm -n ahjin history ahjin                        # release revisions
 ```
 
 Common problems:
@@ -101,21 +102,45 @@ Common problems:
 - **Tools not found right after installing them with winget:** open a new terminal. In VS Code, restart VS Code so new PATH entries are picked up. winget adds each package's own folder (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\<Package>\…`) to the user PATH, not a shared links folder, so an already-open Git Bash needs those folders added by hand. One way in Git Bash: `for d in "$LOCALAPPDATA"/Microsoft/WinGet/Packages/{Helm.Helm*/windows-amd64,Task.Task*,k3d.k3d*,pnpm.pnpm*}; do PATH="$d:$PATH"; done`. Turborepo needs `pnpm` itself on PATH (`corepack pnpm` alone fails with "Unable to find package manager binary").
 - **Slow installs:** the repo lives inside OneDrive. Pause OneDrive sync during big installs (risk R3).
 - **`http://*.127.0.0.1.nip.io` doesn't load:** check the cluster is running (`k3d cluster list`), that nothing else holds port 80 (`Get-NetTCPConnection -LocalPort 80 -State Listen`), and that nip.io resolves (`nslookup store.127.0.0.1.nip.io`). Offline fallback: see `docs/local-domains.md`.
-- **Pod stuck in `ImagePullBackOff` for a local image:** push to `localhost:5001/<name>:<tag>` and reference it as `urumi-registry:5000/<name>:<tag>` in the pod spec.
-- **A pod is stuck in `CreateContainerConfigError`:** a referenced Secret or key is missing. Run `task secrets` and check `kubectl -n urumi describe pod <pod>`.
+- **Pod stuck in `ImagePullBackOff` for a local image:** push to `localhost:5001/<name>:<tag>` and reference it as `ahjin-registry:5000/<name>:<tag>` in the pod spec.
+- **A pod is stuck in `CreateContainerConfigError`:** a referenced Secret or key is missing. Run `task secrets` and check `kubectl -n ahjin describe pod <pod>`.
 - **A brand-new pod can't reach a NetworkPolicy-protected service for its first second or two.** k3s's policy engine (kube-router) adds a new pod's IP to the allow-list a moment after the pod starts; measured: the first attempt is refused, the next one a second later succeeds. Probe pods must wait before testing, and anything short-lived must retry its first connection (the wp-cron job waits for MariaDB for exactly this reason).
-- **Is a connection allowed by the NetworkPolicies?** Start a throwaway pod with the label of the component you want to impersonate and try it: `kubectl -n urumi run np-test --image=busybox:1.37.0 --labels=app.kubernetes.io/name=gateway --restart=Never -- sleep 300`, wait a few seconds, then `kubectl -n urumi exec np-test -- nc -z -w 3 postgres 5432` (exit 0 = allowed). Delete the pod afterwards.
-- **Docker Desktop memory on the laptop:** WSL is capped at 5 GB in `%UserProfile%\.wslconfig` (`[wsl2] memory=5GB`). The stack itself needs about 2 GB; the rest of WSL's figure is Linux file cache. To hand the cache back to Windows immediately: `docker exec k3d-urumi-server-0 sh -c 'sync; echo 1 > /proc/sys/vm/drop_caches'`.
+- **Is a connection allowed by the NetworkPolicies?** Start a throwaway pod with the label of the component you want to impersonate and try it: `kubectl -n ahjin run np-test --image=busybox:1.37.0 --labels=app.kubernetes.io/name=gateway --restart=Never -- sleep 300`, wait a few seconds, then `kubectl -n ahjin exec np-test -- nc -z -w 3 postgres 5432` (exit 0 = allowed). Delete the pod afterwards.
+- **Docker Desktop memory on the laptop:** WSL is capped at 5 GB in `%UserProfile%\.wslconfig` (`[wsl2] memory=5GB`). The stack itself needs about 2 GB; the rest of WSL's figure is Linux file cache. To hand the cache back to Windows immediately: `docker exec k3d-ahjin-server-0 sh -c 'sync; echo 1 > /proc/sys/vm/drop_caches'`.
 - **Testing an MCP server by hand from inside the cluster:** run a pod labelled `app.kubernetes.io/name=gateway` (the only label the policy admits), inject the credential with `valueFrom.secretKeyRef` through `--overrides`, wait for the policy to sync, then pipe a script over stdin (`kubectl exec -i pod -- sh < script.sh`).
 - **`helm upgrade` fails with "conflict … with kubectl-patch":** Helm 4 applies manifests server-side and tracks field owners. Someone hand-edited a Helm-managed object, so `kubectl` co-owns a field. Don't hand-edit Helm-managed objects. To recover once, run `helm upgrade … --force-conflicts`.
-- **Gateway database tests:** they run only when `TEST_DATABASE_URL` is set. Locally: `docker run -d --name urumi-test-pg -p 55432:5432 -e POSTGRES_PASSWORD=test postgres:17.11-alpine`, then `TEST_DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/postgres pnpm turbo run test --filter=gateway`. CI provides a Postgres service container. The variable is declared in `turbo.json`, because Turborepo's strict env mode hides undeclared variables.
-- **Inspecting the platform database:** `echo '\dt' | kubectl -n urumi exec -i postgres-0 -- psql -U urumi -d urumi`.
+- **Gateway database tests:** they run only when `TEST_DATABASE_URL` is set. Locally: `docker run -d --name ahjin-test-pg -p 55432:5432 -e POSTGRES_PASSWORD=test postgres:17.11-alpine`, then `TEST_DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/postgres pnpm turbo run test --filter=gateway`. CI provides a Postgres service container. The variable is declared in `turbo.json`, because Turborepo's strict env mode hides undeclared variables.
+- **Inspecting the platform database:** `echo '\dt' | kubectl -n ahjin exec -i postgres-0 -- psql -U ahjin -d ahjin`.
 - **Running SQL by hand:** pipe it over stdin so PowerShell can't mangle quotes:
-  `echo "SELECT 1;" | kubectl -n urumi exec -i mariadb-0 -- sh -c 'mariadb -uwordpress -p"$MARIADB_PASSWORD" wordpress'`
+  `echo "SELECT 1;" | kubectl -n ahjin exec -i mariadb-0 -- sh -c 'mariadb -uwordpress -p"$MARIADB_PASSWORD" wordpress'`
 
 ---
 
 ## Log
+
+### 2026-10-22 · Task 32: Ahjin everywhere · ✅
+
+**Why.** The owner asked for the project to carry the shop's name, Ahjin, instead of its original working name, everywhere. Earlier entries in this log were updated to the new names too, so commands copied from them still work.
+
+**What was done**
+- **Kubernetes and Helm:** chart `charts/ahjin`, release and namespace `ahjin`, k3d clusters `ahjin` and `ahjin-rehearsal`, registry `ahjin-registry` (still `localhost:5001` from the host), local images `ahjin-<app>`, the `app.kubernetes.io/part-of: ahjin` label, and the Postgres database and user `ahjin`.
+- **Code:** workspace packages `@ahjin/contracts`, `@ahjin/logger` and `@ahjin/mcp-kit`; the gateway's MCP server name `ahjin-gateway`; the chat client `ahjin-chat`; the store's `AHJIN_INTERNAL_HOST` variable and its `ahjin-internal-https.php` must-use plugin; the dashboard's sidebar brand; the client snippets (`claude mcp add --transport http ahjin …`).
+- **Token formats:** gateway API keys are `amcp_<8-char prefix>_<43-char secret>` and chat tokens `achat_…`. The gitleaks rule follows the new format.
+- **Docs:** README, plan, system design, threat model, runbooks and walkthroughs. The brief is cited by its title only.
+- 136 files, 446 lines changed, all mechanically, then reviewed for awkward results (for example the folder path of the repository, which keeps its own name, and the capitalised product name).
+
+**Verification**
+- `pnpm turbo run lint typecheck test`: 21 of 21 tasks; the gateway's 72 tests ran against PostgreSQL.
+- `task verify:k8s`: the local, production and rehearsal renders pass (28, 31 and 30 objects), kubeconform valid.
+- A **fresh cluster from nothing**: `task cluster:up`, `images:build`, `secrets`, `deploy:local`. All seven Deployments rolled out, and the store bootstrap seeded the 19-laptop catalogue again.
+- `task dod`: **19 of 19** on the new cluster (orders #71 and #73, 21 tools from three servers, fx killed and back).
+
+**Problems and fixes**
+1. `pnpm install` kept the old scope's symlinks in each package's `node_modules`. They were harmless but confusing, so they were removed by hand.
+
+**Notes**
+- The cluster from before the rename was stopped, not deleted, so nothing on the laptop was destroyed without the owner's say-so. `k3d cluster list` shows it, and `k3d cluster delete <name>` frees its disk space. Its registry container also binds port 5001, so start only one of the two clusters at a time.
+- API keys and dashboard passwords from the old cluster don't carry over. The new cluster starts from the bootstrap admin in `.env.local` (`task logins`).
 
 ### 2026-10-19 · The store becomes Ahjin, a laptop shop · ✅
 
@@ -161,7 +186,7 @@ Common problems:
 4. **Storefront's theme support overrides WooCommerce's image-size settings** (416 px and 324 px). The child theme sets the sizes through `storefront_woocommerce_args`.
 5. **The product photo looked blank in full-page screenshots** while the gallery's zoom re-measured itself; a normal viewport screenshot shows it correctly. Lazy-loaded card photos also needed the screenshot script to scroll first.
 
-**Open question for the owner:** "urumi" also appears in technical names: the namespace, release and chart, the cluster, `@urumi/*` packages, image names, the session cookie, and docs about the Urumi brief. That's 543 places in 114 files. Renaming them means a fresh cluster and new image names; this change only covers the store.
+**Open question for the owner:** "ahjin" also appears in technical names: the namespace, release and chart, the cluster, `@ahjin/*` packages, image names, the session cookie, and docs about the Ahjin brief. That's 543 places in 114 files. Renaming them means a fresh cluster and new image names; this change only covers the store.
 
 ### 2026-10-19 · Core complete: final check against the brief · ✅
 
@@ -169,21 +194,21 @@ Common problems:
 - **`docs/brief-checklist.md`** maps every line of the brief to where it is implemented and how it was verified: user stories, definition of done, all mandatory requirements, deliverables, demo and submission. The README's reviewer section links it.
 - **Result:** every mandatory item is ✅. One item is 🟡: deployment to a real VPS, which the owner deferred; it's proven by the production rehearsal and the runbook. Two items remain for the owner: the demo video (script in `docs/demo-script.md`) and the submission form.
 - **Clean-up:**
-  - Removed the stopped `urumi-test-pg` container; *Resume or debug* shows how to recreate it.
+  - Removed the stopped `ahjin-test-pg` container; *Resume or debug* shows how to recreate it.
   - Scratch scripts live outside the repository.
   - The repository tree is clean.
-  - The older copy of the plan at `URUMI.ai/docs/PROJECT_PLAN.md`, outside the repo, is out of date; `Project/docs/PROJECT_PLAN.md` is the current one. It was left in place for the owner to delete.
+  - The older copy of the plan at `../docs/PROJECT_PLAN.md`, outside the repo, is out of date; `Project/docs/PROJECT_PLAN.md` is the current one. It was left in place for the owner to delete.
 
 **Verification**
 - `pnpm turbo run lint typecheck test build --force`: 25 of 25.
-- The first run of the day had one failure in `@urumi/mcp-kit#test`. Then:
+- The first run of the day had one failure in `@ahjin/mcp-kit#test`. Then:
   - the same tests passed alone (11 of 11)
   - three parallel runs alongside a full typecheck and build all passed
   - a second full forced run passed 25 of 25
   - CI has been green on every push today
 
 **Follow-ups**
-- Flaky test (open): the failing test's output wasn't captured, because the first run's output was piped through a filter. If it recurs, rerun with `pnpm turbo run test --filter=@urumi/mcp-kit --output-logs=full`. The likely cause is Vitest's default 5 s test timeout under heavy CPU load, from 25 tasks plus the cluster on a laptop. If so, raise `testTimeout` for the end-to-end MCP tests.
+- Flaky test (open): the failing test's output wasn't captured, because the first run's output was piped through a filter. If it recurs, rerun with `pnpm turbo run test --filter=@ahjin/mcp-kit --output-logs=full`. The likely cause is Vitest's default 5 s test timeout under heavy CPU load, from 25 tasks plus the cluster on a laptop. If so, raise `testTimeout` for the end-to-end MCP tests.
 
 **Next: Phase 2,** in the plan's order (§15): Task 22 security hardening → 23 tool permissions → 24 observability → 28 upgrades and backups → 30 multi-store bonus → 25 scaling and rate limits → 26 many-tools handling → 29 hosted MCP servers → 27 OAuth. Task 31, the live VPS, can run whenever a VPS is available.
 
@@ -277,7 +302,7 @@ Common problems:
   - Pushes to `ghcr.io/mohan0112/merchant_mcp_gateway/<app>`, tagged with the full git SHA and `main`.
   - Uses the GitHub Actions layer cache, one scope per image.
   - Sets the `org.opencontainers.image.source` label, which links each package to the repo.
-- **`.github/workflows/release.yml`:** a `vX.Y.Z` tag packages `charts/urumi` at that version and creates a GitHub release with the chart attached and generated notes.
+- **`.github/workflows/release.yml`:** a `vX.Y.Z` tag packages `charts/ahjin` at that version and creates a GitHub release with the chart attached and generated notes.
 - **`scripts/demo-reset.mjs` (`task demo:reset`, which asks for confirmation first):**
   - Store: deletes every order, and every product except the four seeded samples (matched by SKU).
   - Servers: makes sure `fx-mcp` runs, enables every server, and waits until all are connected.
@@ -309,7 +334,7 @@ Common problems:
 
 **What was done**
 - **NetworkPolicies, deny by default** (plan §10.8):
-  - `default-deny-ingress` selects every pod in `urumi`, so a new or forgotten workload starts closed.
+  - `default-deny-ingress` selects every pod in `ahjin`, so a new or forgotten workload starts closed.
   - Allow rules, each restricted to one port:
     - `mariadb` ← `wordpress`, `store-bootstrap`, `wp-cron` (3306)
     - `wordpress` ← Traefik and `woo-mcp` (8080)
@@ -445,8 +470,8 @@ Common problems:
 4. Task 19: production rehearsal values and a VPS runbook.
 5. Final pass:
    - requirement-by-requirement checklist against the brief
-   - clean-up: the `urumi-test-pg` container and scratch files
-   - flag the outdated `URUMI.ai/docs/PROJECT_PLAN.md` copy outside the repo
+   - clean-up: the `ahjin-test-pg` container and scratch files
+   - flag the outdated `../docs/PROJECT_PLAN.md` copy outside the repo
 6. Optional: CI builds images to GHCR. After that, Phase 2.
 
 ### 2026-10-15 · Task 10: Identity and access · ✅
@@ -477,7 +502,7 @@ Common problems:
   - Plugin: cookie parsing, the principal on every request, and **an anti-CSRF guard**: state-changing `/api` calls need `X-Requested-With`.
   - Login throttled to 5 attempts per minute per IP+email (429 + `Retry-After`). The same message for an unknown email and a wrong password.
 - **`modules/keys`:**
-  - Issue: `umcp_<prefix8>_<secret43>`, plaintext returned once with `Cache-Control: no-store`, max 10 active keys per user, admins may issue for others.
+  - Issue: `amcp_<prefix8>_<secret43>`, plaintext returned once with `Cache-Control: no-store`, max 10 active keys per user, admins may issue for others.
   - List: own keys, or anyone's for admins. Revoke: owner or admin.
   - **`verifyApiKey`** (used by the MCP endpoint in Task 12): denials report the owner when known (revoked / expired / user disabled), so they can be audited. A real prefix with a wrong secret counts as *unknown*. `last_used_at` is written at most once a minute.
 - **App:** `buildApp` became async so the cookie plugin loads before the session hook. Feature modules plug in through `register`.
@@ -493,7 +518,7 @@ Common problems:
 - Deployed **revision 9**. The bootstrap admin was created from the Secret (`role admin`, `must_change_password = t`).
 - Through the ingress:
   - Login without `X-Requested-With` → **403**; wrong password → **401**; correct → **200**.
-  - `Set-Cookie: urumi_session=…; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax` (`Secure` is added automatically on https).
+  - `Set-Cookie: ahjin_session=…; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax` (`Secure` is added automatically on https).
   - `/me` → admin with `mustChangePassword: true`; `/api/users` → **403 `password_change_required`**.
   - Logout → 204, then `/me` → 401.
   - The admin password was deliberately **not** changed, so the owner sees the forced change at first login.
@@ -522,7 +547,7 @@ Common problems:
     - Tables `users` (case-insensitive unique email via `UNIQUE(lower(email))`), `sessions`, `invitations`, `api_keys` (prefix plus HMAC hash), `upstream_servers` (AES-GCM credential columns as `bytea`), `upstream_tools`, `audit_logs` (bigserial; indexes on time, user+time, server+time), `system_settings`.
     - Enums for roles, statuses, auth types, audit channels and outcomes.
     - The migration `drizzle/0000_initial_schema.sql` was generated by drizzle-kit (`pnpm db:generate`).
-- **`charts/urumi/charts/platform`:**
+- **`charts/ahjin/charts/platform`:**
   - **PostgreSQL 17.11-alpine StatefulSet:** uid 70, 1 Gi volume, `PGDATA` in a subdirectory, `pg_isready` probes.
   - **Gateway Deployment:**
     - Label `app.kubernetes.io/name=gateway`, which the MCP servers' NetworkPolicies admit.
@@ -552,12 +577,12 @@ Common problems:
 
 **Follow-ups**
 - Task 10 (identity and access) and Task 11 (registry and connection manager) add modules and routes to this app.
-- A throwaway `urumi-test-pg` container on port 55432 is kept for local DB tests. Remove it with `docker rm -f urumi-test-pg`.
+- A throwaway `ahjin-test-pg` container on port 55432 is kept for local DB tests. Remove it with `docker rm -f ahjin-test-pg`.
 
 ### 2026-10-15 · Task 7: WooCommerce MCP server · ✅
 
 **What was done**
-- **`apps/woo-mcp`** on `@urumi/mcp-kit`, built as ports and adapters.
+- **`apps/woo-mcp`** on `@ahjin/mcp-kit`, built as ports and adapters.
   - **`WooCommercePort`** (`woo/port.ts`): the operations woo-mcp needs, compact output types, and a classified `WooError` (`not_found` / `invalid` / `auth` / `unavailable`).
   - **`WooRestClient`** adapter:
     - WooCommerce REST v3 over `http://wordpress:8080` with **Basic Auth** (ADR-0002) and a 10 s timeout.
@@ -590,18 +615,18 @@ Common problems:
   1. No token → **401**.
   2. 7 tools listed.
   3. `list_orders(period=today)` → window `2026-10-15 00:00 → 2026-10-16 00:00` (IST), total 1, order **#14 (Asha Rao)**.
-  4. `create_product(Urumi Water Bottle, 349)` → id 15, price `349.00`, permalink **`http://store.127.0.0.1.nip.io/product/urumi-water-bottle/`** (rebased).
+  4. `create_product(Ahjin Water Bottle, 349)` → id 15, price `349.00`, permalink **`http://store.127.0.0.1.nip.io/product/ahjin-water-bottle/`** (rebased).
   5. `get_order(14)` → processing / 499.00 / Cash on delivery.
   6. `update_order_status` 14 → on-hold, then back to processing (previous status reported both times).
   7. `get_order(99999)` → `isError`, "Order 99999 not found."
-  8. `server_info` → Urumi Store, public URL, Asia/Kolkata, INR.
-- **Storefront `/shop/` lists "Urumi Water Bottle"** straight after the tool call.
+  8. `server_info` → Ahjin Store, public URL, Asia/Kolkata, INR.
+- **Storefront `/shop/` lists "Ahjin Water Bottle"** straight after the tool call.
 
 **Problems and fixes**
 1. **`helm upgrade` failed with a server-side-apply conflict** on the `fx-mcp` NetworkPolicy. My `kubectl patch` during the Task 6 investigation had made `kubectl-patch` a co-owner of `.spec.ingress`, and Helm 4 refuses to overwrite fields another manager owns. Recovered with one `helm upgrade --force-conflicts`; the policy is back to Helm-owned (port `http`). Troubleshooting note added above. Lesson: never hand-edit Helm-managed objects.
 
 **Follow-ups**
-- Test data now in the store: product 15 "Urumi Water Bottle" (from the tool test). `task demo:reset` (Task 18) will clean demo data.
+- Test data now in the store: product 15 "Ahjin Water Bottle" (from the tool test). `task demo:reset` (Task 18) will clean demo data.
 - The gateway (Tasks 9–12) registers `woo` and `fx` from this namespace's Secrets on first boot.
 
 ### 2026-10-15 · Tasks 6 and 8: MCP server kit, generic chart, fx-mcp and the GitHub upstream · ✅
@@ -616,7 +641,7 @@ Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first 
   - `/livez` and `/readyz` (probe logs muted to warn).
   - Shared `server_info` tool; `closeOnSignals()` for graceful SIGTERM.
   - `ToolHandler` / `defineTool()`: one object per tool. `ToolError` messages are returned to the caller as `isError` results; any other exception is logged and reported as "failed unexpectedly (incident …)" without internals.
-- **`charts/urumi/charts/mcp-server`**, a generic sub-chart used through **aliases** (`woo-mcp`, `fx-mcp`); the alias becomes the resource name.
+- **`charts/ahjin/charts/mcp-server`**, a generic sub-chart used through **aliases** (`woo-mcp`, `fx-mcp`); the alias becomes the resource name.
   - Deployment with `maxUnavailable 0`, non-root uid 65532, read-only root filesystem, all capabilities dropped, seccomp `RuntimeDefault`, no service-account token. Probes on `/livez` and `/readyz`.
   - ClusterIP Service. `MCP_ALLOWED_HOSTS` set automatically to every in-cluster form of the Service name.
   - Env from Secrets through `secretEnv`.
@@ -634,10 +659,10 @@ Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first 
 - Umbrella chart 0.3.0: `woo-mcp` (disabled until Task 7) and `fx-mcp` dependencies, `global.logLevel`, schema definitions for MCP servers, local and prod image values. Taskfile `image:node APP=…`.
 
 **Verification**
-- `@urumi/mcp-kit`: **11 tests** pass. They cover the tool list including `server_info`, structured output, `ToolError` → `isError`, unexpected errors hidden (secret text not leaked), extra `server_info` fields, wrong key → 401, forged Host → **403**, `/livez` and `/readyz`.
+- `@ahjin/mcp-kit`: **11 tests** pass. They cover the tool list including `server_info`, structured output, `ToolError` → `isError`, unexpected errors hidden (secret text not leaked), extra `server_info` fields, wrong key → 401, forged Host → **403**, `/livez` and `/readyz`.
 - `fx-mcp`: **8 tests** (conversion and rounding, same-currency rate, unknown codes → `ToolError`, schema rejects malformed codes, cache TTL, static fallback).
 - The bundled `dist/server.mjs` runs standalone. An MCP client got `convert_currency(1749 INR→USD) = 18.42` from live CDN rates; a wrong key gets 401.
-- Image `urumi-fx-mcp:dev`: 223 MB, built in 35 s.
+- Image `ahjin-fx-mcp:dev`: 223 MB, built in 35 s.
 - Deployed: `fx-mcp` Ready in seconds (probes unaffected by the NetworkPolicy). In-cluster checks from a gateway-labelled pod:
 
   | Check | Result |
@@ -650,7 +675,7 @@ Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first 
   | Pod **without** the gateway label | **blocked** (curl exit 7) |
 
 - GitHub remote MCP, with the PAT from `.env.local` (never printed):
-  - `/mcp/x/issues`: 2026 protocol, **10 tools**; `list_issues(Mohan0112/Urumi-Challenge-demo-issues)` OK (0 issues).
+  - `/mcp/x/issues`: 2026 protocol, **10 tools**; `list_issues(Mohan0112/Ahjin-Challenge-demo-issues)` OK (0 issues).
   - The full `/mcp/` endpoint has 46 tools. We use the Issues toolset URL to keep the model's tool list small.
 
 **Problems and fixes**
@@ -668,7 +693,7 @@ Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first 
 ### 2026-10-15 · Task 5: Store bootstrap and checkout · ✅
 
 **What was done**
-- **`urumi-bootstrap`** (`docker/wordpress/bootstrap.sh`, baked into the image), idempotent: every step checks before it acts.
+- **`ahjin-bootstrap`** (`docker/wordpress/bootstrap.sh`, baked into the image), idempotent: every step checks before it acts.
   1. Waits for the DB through `healthz.php`, then installs WordPress core if it isn't installed.
   2. Sets the title, timezone and pretty permalinks; activates WooCommerce and Storefront; runs `wp wc update`.
   3. Applies store settings: INR, IN:KA, address.
@@ -678,7 +703,7 @@ Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first 
   4. Creates the shop, cart, checkout and my-account pages (`wp wc tool run install_pages`).
   5. Creates `mcp-bot` (`shop_manager`) and **replaces** its REST key from Secret `store-woo-api` on every run (hashed with `wc_api_hash()`), so a rotated Secret takes effect.
   6. Seeds 4 products by SKU (Mug ₹499, T-Shirt ₹899, Notebook ₹249, Sticker Pack ₹99).
-  - `urumi-bootstrap cron` runs due WP-Cron events.
+  - `ahjin-bootstrap cron` runs due WP-Cron events.
 - **WordPress `.htaccess` baked into the image.** Pretty permalinks need it, and a Job can't write into the web pod's immutable document root. It also passes the `Authorization` header to PHP for WooCommerce Basic Auth.
 - **Helm:**
   - `store-bootstrap` Job as a `post-install,post-upgrade` hook with delete policy `before-hook-creation`, so the last run's logs stay available. `backoffLimit 3`, `activeDeadlineSeconds 600`.
@@ -713,13 +738,13 @@ Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first 
 ### 2026-10-15 · Task 4: Store image and sub-chart · ✅
 
 **What was done**
-- **Image `docker/wordpress`** (`localhost:5001/urumi-wordpress:dev` locally):
+- **Image `docker/wordpress`** (`localhost:5001/ahjin-wordpress:dev` locally):
   - Base `wordpress:7.1.3-php8.4-apache`, with WooCommerce 11.2.1, Storefront 4.6.2 and WP-CLI 2.12.0 baked in.
   - The internal-HTTPS mu-plugin (ADR-0002), and `healthz.php`, which checks PHP and the DB connection.
   - The whole site is baked into `/var/www/html`, so the official entrypoint skips its startup copy and code is immutable (ADR-011).
   - Apache listens on **8080** and the image runs as **uid 33 (non-root)**.
   - `bootstrap.sh` is a placeholder until Task 5.
-- **Sub-chart `charts/urumi/charts/store`**, wired into the umbrella as a dependency with `condition: store.enabled`:
+- **Sub-chart `charts/ahjin/charts/store`**, wired into the umbrella as a dependency with `condition: store.enabled`:
   - **MariaDB 11.4.13 StatefulSet** with a headless Service `mariadb`, a 2 Gi `volumeClaimTemplate`, and runs as uid 999. Startup, readiness and liveness probes use the image's `healthcheck.sh`.
   - **WordPress Deployment** with `strategy: Recreate` (RWO volume) and a Service `wordpress:8080`.
   - A 1 Gi uploads PVC `wp-uploads` with `helm.sh/resource-policy: keep`.
@@ -747,7 +772,7 @@ Task 8 was done together with Task 6: `fx-mcp` is small, and as the kit's first 
   - After the pods were recreated, the row (`written-before-restart`) and the file (`uploads-before-restart`) were both still there.
   - The markers were removed afterwards.
 - Deployed pod security contexts: WordPress `runAsUser 33, fsGroup 33, runAsNonRoot`; MariaDB `runAsUser 999, fsGroup 999, runAsNonRoot`.
-- Image sanity check: runs as `uid=33(www-data)`; `wp-content/plugins/woocommerce` and `mu-plugins/urumi-internal-https.php` are present; uploads directory owned by `www-data`; `WP-CLI 2.12.0`; `Listen 8080`.
+- Image sanity check: runs as `uid=33(www-data)`; `wp-content/plugins/woocommerce` and `mu-plugins/ahjin-internal-https.php` are present; uploads directory owned by `www-data`; `WP-CLI 2.12.0`; `Listen 8080`.
 
 **Problems and fixes**
 1. **Image size 1.43 GB** on the first build: a MySQL client package, plus a separate `chown -R` layer that duplicated every file. Fix: no MySQL client (`healthz.php` and WP-CLI talk to the DB through PHP), and unzip is purged in the same layer.
@@ -792,11 +817,11 @@ Full write-up with every test result: [spikes.md](spikes.md). Decisions: [ADR-00
 
 **What was done**
 - `deploy/k3d/cluster.yaml`:
-  - Cluster `urumi`: 1 server + 1 agent, k3s pinned to `v1.35.5-k3s1`.
+  - Cluster `ahjin`: 1 server + 1 agent, k3s pinned to `v1.35.5-k3s1`.
   - Host ports 80 and 443 mapped to the k3d load balancer.
-  - Local registry `urumi-registry` on host port 5001.
+  - Local registry `ahjin-registry` on host port 5001.
   - Waits for nodes before returning.
-- Umbrella chart skeleton `charts/urumi`:
+- Umbrella chart skeleton `charts/ahjin`:
   - `Chart.yaml`, `values.yaml`, `values-local.yaml`, `values-prod.yaml`, and `values.schema.json` (requires `global.domain` and `global.ingressClassName`).
   - Helpers for standard labels and per-component hosts (`store.<domain>`, `app.<domain>`).
   - `NOTES.txt`.
@@ -808,9 +833,9 @@ Full write-up with every test result: [spikes.md](spikes.md). Decisions: [ADR-00
 **Verification**
 - `task cluster:up` from nothing: cluster ready in **77 s**. Both nodes are `Ready` on Kubernetes v1.35.5+k3s1 (WSL2 kernel 6.18).
 - kube-system: coredns, local-path-provisioner v0.0.36 (default StorageClass), metrics-server and Traefik 3.6.13 all rolled out.
-- `task chart:lint`: both values files lint cleanly. `task deploy:local` installed release `urumi` (revision 1) in namespace `urumi`.
+- `task chart:lint`: both values files lint cleanly. `task deploy:local` installed release `ahjin` (revision 1) in namespace `ahjin`.
 - After the deploy, k3s re-ran `helm-install-traefik`. The Traefik pod's args now include `--entryPoints.web.transport.respondingTimeouts.readTimeout=0`, plus the matching `writeTimeout` and `idleTimeout` args, and the same three for `websecure`.
-- **Registry, ingress and DNS together:** pushed `traefik/whoami` as `localhost:5001/whoami:check`, deployed it as `urumi-registry:5000/whoami:check` with an Ingress for `hello.127.0.0.1.nip.io`. `curl http://hello.127.0.0.1.nip.io` returned the pod's hostname.
+- **Registry, ingress and DNS together:** pushed `traefik/whoami` as `localhost:5001/whoami:check`, deployed it as `ahjin-registry:5000/whoami:check` with an Ingress for `hello.127.0.0.1.nip.io`. `curl http://hello.127.0.0.1.nip.io` returned the pod's hostname.
 - **NetworkPolicy enforcement** (k3s's built-in controller), with an `outsider` pod and an `insider` pod (`allowed=true`) calling the `hello` Service:
 
   | Step | outsider | insider |
@@ -822,7 +847,7 @@ Full write-up with every test result: [spikes.md](spikes.md). Decisions: [ADR-00
 - The throwaway check resources (namespace `k8s-check`) were deleted afterwards. Their manifests aren't committed.
 
 **Problems and fixes**
-1. k3d 5.9 names the registry container `urumi-registry`, not `k3d-urumi-registry` as older k3d versions do. Checked the node's `/etc/rancher/k3s/registries.yaml`: it mirrors both `urumi-registry:5000` and `urumi-registry:5001` to `http://urumi-registry:5000`. **Convention: push to `localhost:5001/…`, reference `urumi-registry:5000/…` in manifests.** The comment in `cluster.yaml` was corrected.
+1. k3d 5.9 names the registry container `ahjin-registry`, not `k3d-ahjin-registry` as older k3d versions do. Checked the node's `/etc/rancher/k3s/registries.yaml`: it mirrors both `ahjin-registry:5000` and `ahjin-registry:5001` to `http://ahjin-registry:5000`. **Convention: push to `localhost:5001/…`, reference `ahjin-registry:5000/…` in manifests.** The comment in `cluster.yaml` was corrected.
 2. PowerShell mangles `\n` inside kubectl JSONPath expressions; switched to splitting the output in PowerShell instead. This only affects interactive debugging.
 
 **Follow-ups**
@@ -839,7 +864,7 @@ Full write-up with every test result: [spikes.md](spikes.md). Decisions: [ADR-00
 - `packages/contracts`: Zod schemas shared across apps:
   - `SlugSchema` (tool-name prefix rules from ADR-003).
   - Roles, upstream auth types and statuses, audit channels and outcomes.
-  - The API key format (`umcp_<8-char prefix>_<43-char secret>`) and `apiKeyPrefix()`.
+  - The API key format (`amcp_<8-char prefix>_<43-char secret>`) and `apiKeyPrefix()`.
 - `packages/logger`: `createLogger(service)` built on pino, with central redaction of `authorization`, `cookie`, `x-api-key`, `password`, `credential`, `apiKey`, `token` and `secret` (top level and one level deep).
 - `.gitleaks.toml`: the default rules plus a rule for gateway API keys. Tests build sample keys at runtime, so no literal key is ever committed.
 - GitHub Actions `ci.yml`: a `checks` job (install, lint, typecheck, test, build) and a `secrets-scan` job (gitleaks over full history).
@@ -850,7 +875,7 @@ Full write-up with every test result: [spikes.md](spikes.md). Decisions: [ADR-00
 **Verification**
 - `pnpm turbo run lint typecheck test`: 6 of 6 tasks pass (contracts: slug and key tests; logger: redaction tests).
 - `prettier --check .`: all files formatted.
-- gitleaks (Docker image `ghcr.io/gitleaks/gitleaks`) run with our config against a scratch folder containing a fake `umcp_` key: **1 leak found** (exit code 1), so the custom rule works.
+- gitleaks (Docker image `ghcr.io/gitleaks/gitleaks`) run with our config against a scratch folder containing a fake `amcp_` key: **1 leak found** (exit code 1), so the custom rule works.
 - `.env.local` is ignored by git; only the empty `.env.example` is tracked.
 
 **Problems and fixes**

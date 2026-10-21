@@ -9,10 +9,10 @@ A short guide to what exists after the first milestone, why it's built this way,
 | Monorepo | `package.json`, `pnpm-workspace.yaml`, `turbo.json` | One repo for every service; pnpm installs, Turborepo runs `lint`/`typecheck`/`test`/`build` per package and caches results |
 | Shared schemas | `packages/contracts` | Zod schemas used by both the dashboard and the backend (slug rules, roles, audit outcomes, API key format) |
 | Logger | `packages/logger` | pino JSON logs; secrets (`authorization`, `password`, `token`…) are replaced with `[REDACTED]` centrally |
-| Secret scanning | `.gitleaks.toml`, CI `secrets-scan` | Blocks committed secrets, including our own `umcp_…` API key format |
+| Secret scanning | `.gitleaks.toml`, CI `secrets-scan` | Blocks committed secrets, including our own `amcp_…` API key format |
 | CI | `.github/workflows/ci.yml` | Lint/typecheck/test/build, Helm lint and render (local and prod values), gitleaks over full history |
 | Local cluster | `deploy/k3d/cluster.yaml` | k3s in Docker (k3d): 1 server + 1 agent, Traefik ingress on ports 80/443, local image registry on 5001 |
-| Helm chart | `charts/urumi` | One umbrella chart; for now only the Traefik timeout override, components are added task by task |
+| Helm chart | `charts/ahjin` | One umbrella chart; for now only the Traefik timeout override, components are added task by task |
 | Decisions | `docs/adr/0001…0003`, `docs/spikes.md` | Why TypeScript 6, why WooCommerce REST + Basic Auth, why MCP SDK v2 stateless |
 
 ## How a request reaches a pod (local)

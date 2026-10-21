@@ -1,4 +1,4 @@
-import { createLogger } from '@urumi/logger';
+import { createLogger } from '@ahjin/logger';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { Writable } from 'node:stream';

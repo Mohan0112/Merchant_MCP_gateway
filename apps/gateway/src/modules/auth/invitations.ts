@@ -1,4 +1,4 @@
-import type { Invitation, Role } from '@urumi/contracts';
+import type { Invitation, Role } from '@ahjin/contracts';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { GatewayContext } from '../../context';
 import { invitations } from '../../db/schema';

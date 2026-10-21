@@ -4,7 +4,7 @@ import { sessions, users } from '../../db/schema';
 import { randomToken, sha256 } from '../../lib/crypto';
 import type { Principal } from './principal';
 
-export const SESSION_COOKIE = 'urumi_session';
+export const SESSION_COOKIE = 'ahjin_session';
 const IDLE_MS = 12 * 60 * 60 * 1000; // signed out after 12 h without activity
 export const ABSOLUTE_MS = 7 * 24 * 60 * 60 * 1000; // and after 7 days regardless
 const TOUCH_MS = 5 * 60 * 1000; // record activity at most every 5 minutes

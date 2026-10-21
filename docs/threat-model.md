@@ -21,7 +21,7 @@ flowchart LR
         gh["GitHub MCP"]
         llm["LLM provider"]
     end
-    subgraph cluster["Cluster, namespace urumi (default-deny ingress)"]
+    subgraph cluster["Cluster, namespace ahjin (default-deny ingress)"]
         traefik["Traefik"]
         gw["gateway<br/>auth, routing, audit,<br/>credential decryption"]
         pg[("Postgres")]
@@ -69,7 +69,7 @@ Passing client tokens through would:
 - **move authorization and audit out of the gateway:** each upstream would have to understand our users and keys, and the one place that enforces revocation and writes the audit log would be bypassed;
 - **leak user identity and secrets to third parties** such as GitHub's hosted server.
 
-The MCP authorization specification forbids token passthrough for exactly these reasons. The chat agent follows the same rule: its short-lived `uchat_` token is accepted only by the gateway's own `/mcp`, never forwarded.
+The MCP authorization specification forbids token passthrough for exactly these reasons. The chat agent follows the same rule: its short-lived `achat_` token is accepted only by the gateway's own `/mcp`, never forwarded.
 
 ## Untrusted upstreams: tool descriptions written to manipulate the model
 
@@ -131,10 +131,10 @@ Admins are trusted. An admin who issues a key for a member sees it once, which i
 
 | Secret | At rest | Who can read it in clear |
 |---|---|---|
-| User API key `umcp_<prefix>_<secret>` | HMAC-SHA256 of the whole key with a pepper (Secret `gateway-crypto`) | Only its owner, once, at creation |
+| User API key `amcp_<prefix>_<secret>` | HMAC-SHA256 of the whole key with a pepper (Secret `gateway-crypto`) | Only its owner, once, at creation |
 | Dashboard password | scrypt (N=2¹⁵, r=8, p=3) | Nobody |
 | Session token (cookie) | SHA-256 | The browser; cookie is `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS; expires after 12 h idle or 7 days |
-| Chat token `uchat_…` | SHA-256, in gateway memory only, 5 minutes, bound to a live session | The gateway process |
+| Chat token `achat_…` | SHA-256, in gateway memory only, 5 minutes, bound to a live session | The gateway process |
 | Upstream credentials | AES-256-GCM, random IV per value, key in Secret `gateway-crypto` | The gateway process, when connecting |
 | Database passwords, WordPress salts, REST key, MCP server tokens | Kubernetes Secrets created by `scripts/secrets.mjs` from a git-ignored `.env.local` or generated | Pods that mount them |
 | LLM API keys | Secret `llm` | The gateway pod |

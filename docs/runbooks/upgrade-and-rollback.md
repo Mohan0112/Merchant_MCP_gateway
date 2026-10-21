@@ -1,13 +1,13 @@
 # Runbook: upgrade and roll back
 
-Everything (store, MCP servers, gateway, dashboard, databases) is **one Helm release**, `urumi` in namespace `urumi`. Every `helm upgrade` creates a revision, and `helm rollback` returns the whole platform to a known-good combination of image tags and settings. Commands below use the VPS context; locally use `k3d-urumi` and `values-local.yaml`.
+Everything (store, MCP servers, gateway, dashboard, databases) is **one Helm release**, `ahjin` in namespace `ahjin`. Every `helm upgrade` creates a revision, and `helm rollback` returns the whole platform to a known-good combination of image tags and settings. Commands below use the VPS context; locally use `k3d-ahjin` and `values-local.yaml`.
 
 ## See where you are
 
 ```sh
-helm --kube-context urumi-vps -n urumi history urumi       # every revision, its chart version and status
-helm --kube-context urumi-vps -n urumi get values urumi     # the values of the deployed revision
-kubectl --context urumi-vps -n urumi get pods
+helm --kube-context ahjin-vps -n ahjin history ahjin       # every revision, its chart version and status
+helm --kube-context ahjin-vps -n ahjin get values ahjin     # the values of the deployed revision
+kubectl --context ahjin-vps -n ahjin get pods
 ```
 
 ## Upgrade
@@ -15,25 +15,25 @@ kubectl --context urumi-vps -n urumi get pods
 1. **Build:** merge to `main`. CI builds the five images and pushes them to GHCR tagged with the commit SHA. Check that the `images` workflow finished for that commit.
 2. **Preview (optional):** render the change before applying it:
    ```sh
-   helm template urumi charts/urumi -n urumi -f charts/urumi/values-prod.yaml > new.yaml
-   helm --kube-context urumi-vps -n urumi get manifest urumi > current.yaml
+   helm template ahjin charts/ahjin -n ahjin -f charts/ahjin/values-prod.yaml > new.yaml
+   helm --kube-context ahjin-vps -n ahjin get manifest ahjin > current.yaml
    diff current.yaml new.yaml
    ```
 3. **Back up the databases** if the release touches the store or the schema (commands in [vps.md](vps.md#9-upgrades-rollback-and-backups)).
 4. **Upgrade:**
    ```sh
-   task deploy:prod PROD_CONTEXT=urumi-vps DOMAIN=<domain> LETSENCRYPT_EMAIL=<email> IMAGE_TAG=<sha>
+   task deploy:prod PROD_CONTEXT=ahjin-vps DOMAIN=<domain> LETSENCRYPT_EMAIL=<email> IMAGE_TAG=<sha>
    ```
    It runs `helm upgrade --install … --wait --timeout 15m --rollback-on-failure`. If the new pods don't become ready in time, Helm rolls back to the previous revision by itself (Helm 4's `--rollback-on-failure` replaces Helm 3's `--atomic`).
-5. **Check:** `kubectl -n urumi get pods`, then `task dod CONTEXT=urumi-vps -- --domain=<domain> --scheme=https`.
+5. **Check:** `kubectl -n ahjin get pods`, then `task dod CONTEXT=ahjin-vps -- --domain=<domain> --scheme=https`.
 
 Stateless Deployments (gateway, dashboard, MCP servers) roll with `maxUnavailable: 0, maxSurge: 1`: a new pod must be ready before an old one stops, so an upgrade, or a failed one, causes no downtime. WordPress uses `Recreate`, because its uploads volume is ReadWriteOnce and can't attach to two pods; the storefront is down for the few seconds the new pod takes to start.
 
 ## Roll back
 
 ```sh
-helm --kube-context urumi-vps -n urumi history urumi
-helm --kube-context urumi-vps -n urumi rollback urumi <revision> --wait
+helm --kube-context ahjin-vps -n ahjin history ahjin
+helm --kube-context ahjin-vps -n ahjin rollback ahjin <revision> --wait
 ```
 
 A rollback is itself a new revision, so it can be undone the same way.
@@ -54,7 +54,7 @@ A rollback is itself a new revision, so it can be undone the same way.
 To change one setting of the deployed release, use `--reuse-values` **alone**:
 
 ```sh
-helm --kube-context urumi-vps -n urumi upgrade urumi charts/urumi --reuse-values --set global.logLevel=debug --wait --rollback-on-failure
+helm --kube-context ahjin-vps -n ahjin upgrade ahjin charts/ahjin --reuse-values --set global.logLevel=debug --wait --rollback-on-failure
 ```
 
 Don't add `-f values-prod.yaml` to such a command. The file would be applied on top of the reused values, and its placeholder image tags (`CHANGE-ME-git-sha`) would replace the real ones, so every image would fail to pull. Full deploys go through `task deploy:prod`, which passes the real tags.
@@ -64,15 +64,15 @@ Don't add `-f values-prod.yaml` to such a command. The file would be applied on 
 Run on the production rehearsal cluster (`values-prod.yaml` + `values-rehearsal.yaml`, GHCR images) on 2026-10-19:
 
 ```sh
-CTX=k3d-urumi-rehearsal
-H="helm --kube-context $CTX -n urumi"
+CTX=k3d-ahjin-rehearsal
+H="helm --kube-context $CTX -n ahjin"
 # 1. A good upgrade: change a setting and roll forward
-$H upgrade urumi charts/urumi --reuse-values --set global.logLevel=debug --wait --timeout 5m --rollback-on-failure
+$H upgrade ahjin charts/ahjin --reuse-values --set global.logLevel=debug --wait --timeout 5m --rollback-on-failure
 # 2. Roll it back by hand (0 = the previous revision)
-$H rollback urumi 0 --wait
+$H rollback ahjin 0 --wait
 # 3. A broken upgrade: a gateway image tag that doesn't exist, while probing the gateway every second
-$H upgrade urumi charts/urumi --reuse-values --set platform.gateway.image.tag=does-not-exist --wait --timeout 2m --rollback-on-failure
-$H history urumi
+$H upgrade ahjin charts/ahjin --reuse-values --set platform.gateway.image.tag=does-not-exist --wait --timeout 2m --rollback-on-failure
+$H history ahjin
 ```
 
 | Step | Result |

@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/Mohan0112/Merchant_MCP_gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohan0112/Merchant_MCP_gateway/actions/workflows/ci.yml)
 
-WooCommerce hosting with a **team MCP gateway** on Kubernetes, built for the Urumi AI FDE internship take-home (Round 1, "MCP Gateway on Kubernetes").
+WooCommerce hosting with a **team MCP gateway** on Kubernetes, built for an AI FDE internship take-home (Round 1, "MCP Gateway on Kubernetes"). The shop on it is **Ahjin**, a laptop store.
 
 An admin registers MCP servers once in a dashboard. Every team member then uses all of their tools through **one MCP endpoint and one personal API key**, from Claude Code, Cursor, VS Code or MCP Inspector, or through a **chat agent** in the dashboard. A WooCommerce store in the same cluster is the first data source, exposed by an MCP server written for this project. Upstream credentials never leave the server side, and every tool call is audited under the person who made it.
 
@@ -18,7 +18,7 @@ Every line of the brief, with where it is implemented and how it was verified: [
 | VPS or production-like setup                                            | [Production-like and VPS setup](#production-like-and-vps-setup) and [docs/runbooks/vps.md](docs/runbooks/vps.md) |
 | Placing an order, connecting an MCP client, using the chat agent        | [Using it](#using-it)                                                                                            |
 | Source of the dashboard, gateway, WooCommerce MCP server and chat agent | `apps/dashboard`, `apps/gateway` (chat agent in `src/modules/chat`), `apps/woo-mcp`                              |
-| Helm charts and values files                                            | `charts/urumi`, with `values-local.yaml` and `values-prod.yaml`                                                  |
+| Helm charts and values files                                            | `charts/ahjin`, with `values-local.yaml` and `values-prod.yaml`                                                  |
 | System design and tradeoffs                                             | [docs/system-design.md](docs/system-design.md)                                                                   |
 | Threat model                                                            | [docs/threat-model.md](docs/threat-model.md)                                                                     |
 | Bonus and stand-out items attempted                                     | [Extras and stand-out items](#extras-and-stand-out-items)                                                        |
@@ -31,7 +31,7 @@ flowchart LR
     people(["Browsers:<br/>admins, members, shoppers"])
     clients(["MCP clients:<br/>Claude Code, Cursor,<br/>VS Code, Inspector"])
 
-    subgraph k8s["Kubernetes (k3d locally, k3s on a VPS): namespace urumi, one Helm release"]
+    subgraph k8s["Kubernetes (k3d locally, k3s on a VPS): namespace ahjin, one Helm release"]
         traefik["Traefik ingress"]
         dash["dashboard<br/>React on nginx"]
         gw["gateway<br/>REST /api, MCP /mcp, chat agent"]
@@ -66,7 +66,7 @@ flowchart LR
 
 ### What runs where
 
-Everything is in namespace `urumi`, installed as one Helm release `urumi` from the umbrella chart `charts/urumi`.
+Everything is in namespace `ahjin`, installed as one Helm release `ahjin` from the umbrella chart `charts/ahjin`.
 
 | Workload                     | Kind                     | Exposed as                            | Storage               |
 | ---------------------------- | ------------------------ | ------------------------------------- | --------------------- |
@@ -103,7 +103,7 @@ The store is **Ahjin**, a laptop shop: 19 laptops from eight brands in six categ
 | `packages/mcp-kit`        | What every MCP server here shares: Streamable HTTP, static credential check, Host allow-list, health probes                                                             |
 | `packages/contracts`      | Zod schemas and types shared by the dashboard, gateway and MCP servers                                                                                                  |
 | `packages/logger`         | pino logger with central secret redaction                                                                                                                               |
-| `charts/urumi`            | Umbrella Helm chart; sub-charts `store`, `mcp-server` (used twice, as `woo-mcp` and `fx-mcp`) and `platform`; values for local, production and the production rehearsal |
+| `charts/ahjin`            | Umbrella Helm chart; sub-charts `store`, `mcp-server` (used twice, as `woo-mcp` and `fx-mcp`) and `platform`; values for local, production and the production rehearsal |
 | `docker/`                 | Images: WordPress + WooCommerce with the bootstrap script, one shared image recipe for the Node services, the dashboard                                                 |
 | `deploy/k3d/cluster.yaml` | The local cluster: 1 server and 1 agent on k3s v1.35.5, plus a local registry                                                                                           |
 | `scripts/`                | `secrets.mjs` (Secrets from `.env.local`), `dod-check.mjs` (the definition of done), `verify-k8s.mjs` (chart checks), `demo-reset.mjs` (clean demo state)               |
@@ -158,7 +158,7 @@ The remaining variables (`GITHUB_REPO`, `VPS_*`, `DUCKDNS_*`, `LETSENCRYPT_EMAIL
 ### 2. Create the cluster and deploy
 
 ```sh
-task cluster:up      # k3d cluster "urumi" (1 server + 1 agent) and a registry on localhost:5001
+task cluster:up      # k3d cluster "ahjin" (1 server + 1 agent) and a registry on localhost:5001
 task secrets         # create the Kubernetes Secrets from .env.local; values are never printed
 task images:build    # build the five images and push them to the local registry
 task deploy:local    # helm upgrade --install with values-local.yaml, then wait for every rollout
@@ -198,7 +198,7 @@ task verify:k8s               # probes, resources, non-root and NetworkPolicies 
 task store:bootstrap-logs     # what the last store bootstrap did
 ```
 
-The gateway's database tests run only when `TEST_DATABASE_URL` points at a PostgreSQL; CI provides one, and [docs/BUILD_LOG.md](docs/BUILD_LOG.md#resume-or-debug) shows how to start one locally. `k3d cluster stop urumi` frees the cluster's memory while you're not using it, and `k3d cluster start urumi` brings it back with its data. `task cluster:down` deletes the cluster and everything in it.
+The gateway's database tests run only when `TEST_DATABASE_URL` points at a PostgreSQL; CI provides one, and [docs/BUILD_LOG.md](docs/BUILD_LOG.md#resume-or-debug) shows how to start one locally. `k3d cluster stop ahjin` frees the cluster's memory while you're not using it, and `k3d cluster start ahjin` brings it back with its data. `task cluster:down` deletes the cluster and everything in it.
 
 ## Using it
 
@@ -213,7 +213,7 @@ The gateway's database tests run only when `TEST_DATABASE_URL` points at a Postg
 ### Invite a teammate and create an API key
 
 - **Invite (admin):** in **Members → Invite a teammate**, enter an email, pick a role (a member uses tools; an admin also manages servers and members) and click **Create invitation**. Send the one-time link to your teammate; it's valid for 72 hours and no email is sent. They open it, choose a name and password, and are signed in.
-- **Create a key (anyone):** in **API keys → New key**, name the key (for example "Claude Code on laptop"), optionally pick an expiry, and click **Create key**. The key (`umcp_…`) is shown once, together with ready-to-paste settings for Claude Code, Cursor, VS Code and MCP Inspector. The gateway keeps only a hash of it. Admins can also issue and revoke a member's keys from **Members → API keys**.
+- **Create a key (anyone):** in **API keys → New key**, name the key (for example "Claude Code on laptop"), optionally pick an expiry, and click **Create key**. The key (`amcp_…`) is shown once, together with ready-to-paste settings for Claude Code, Cursor, VS Code and MCP Inspector. The gateway keeps only a hash of it. Admins can also issue and revoke a member's keys from **Members → API keys**.
 
 ### Connect an external MCP client
 
@@ -222,7 +222,7 @@ A client needs only the gateway URL and a key: `http://app.127.0.0.1.nip.io/mcp`
 **Claude Code** (run in a terminal):
 
 ```sh
-claude mcp add --transport http urumi http://app.127.0.0.1.nip.io/mcp --header "Authorization: Bearer <your key>"
+claude mcp add --transport http ahjin http://app.127.0.0.1.nip.io/mcp --header "Authorization: Bearer <your key>"
 ```
 
 **Cursor** (`~/.cursor/mcp.json`):
@@ -230,7 +230,7 @@ claude mcp add --transport http urumi http://app.127.0.0.1.nip.io/mcp --header "
 ```json
 {
   "mcpServers": {
-    "urumi": {
+    "ahjin": {
       "url": "http://app.127.0.0.1.nip.io/mcp",
       "headers": {
         "Authorization": "Bearer <your key>"
@@ -245,7 +245,7 @@ claude mcp add --transport http urumi http://app.127.0.0.1.nip.io/mcp --header "
 ```json
 {
   "servers": {
-    "urumi": {
+    "ahjin": {
       "type": "http",
       "url": "http://app.127.0.0.1.nip.io/mcp",
       "headers": {
@@ -297,9 +297,9 @@ The model is Groq's `openai/gpt-oss-120b`, with Google's `gemini-2.5-flash` as t
 - **Kill an upstream:** the dashboard shows the server as Unreachable with the reason, calls to it fail fast with a clear error, and the other servers keep working. It reconnects by itself when it comes back.
 
 ```sh
-kubectl -n urumi delete pod -l app.kubernetes.io/name=fx-mcp    # the Deployment starts a new pod within seconds
-kubectl -n urumi scale deployment fx-mcp --replicas=0           # or keep it down for a while (what task dod does)
-kubectl -n urumi scale deployment fx-mcp --replicas=1           # and bring it back
+kubectl -n ahjin delete pod -l app.kubernetes.io/name=fx-mcp    # the Deployment starts a new pod within seconds
+kubectl -n ahjin scale deployment fx-mcp --replicas=0           # or keep it down for a while (what task dod does)
+kubectl -n ahjin scale deployment fx-mcp --replicas=1           # and bring it back
 ```
 
 [docs/demo-script.md](docs/demo-script.md) walks through the whole flow with two users. `task demo:reset` restores a clean demo state and creates demo users A and B.
@@ -315,7 +315,7 @@ The same chart installs on k3s on a VPS; only the values files change. k3d is k3
 | Images                 | Local registry, tag `dev`, pulled every time | `ghcr.io/mohan0112/merchant_mcp_gateway/<app>` with an immutable git-SHA tag built by CI                |
 | Storage (`local-path`) | MariaDB 2 Gi, uploads 1 Gi, PostgreSQL 1 Gi  | MariaDB 10 Gi, uploads 5 Gi, PostgreSQL 5 Gi                                                            |
 | Resources              | Lean limits for a laptop                     | Higher limits: gateway and WordPress 768 Mi, MariaDB and PostgreSQL 1 Gi                                |
-| Secrets                | `task secrets` against `k3d-urumi`           | The same script against the VPS's kube context                                                          |
+| Secrets                | `task secrets` against `k3d-ahjin`           | The same script against the VPS's kube context                                                          |
 | Log level              | `debug`                                      | `info`                                                                                                  |
 
 Session cookies get the `Secure` flag automatically over HTTPS. CI renders the chart with both values files on every push.
@@ -325,7 +325,7 @@ Session cookies get the `Secure` flag automatically over HTTPS. CI renders the c
 The production values are proven on a throwaway single-node k3s cluster (like the VPS) that uses `values-prod.yaml` plus `values-rehearsal.yaml`. The only differences from production are the nip.io domain and a self-signed issuer instead of Let's Encrypt, which can't reach a laptop:
 
 ```sh
-task rehearsal:up       # stops the local cluster, creates k3d cluster "urumi-rehearsal" with cert-manager
+task rehearsal:up       # stops the local cluster, creates k3d cluster "ahjin-rehearsal" with cert-manager
 task rehearsal:deploy   # the chart with the production values and the images CI pushed to GHCR
 task rehearsal:dod      # the definition-of-done check over HTTPS
 task rehearsal:down     # deletes the rehearsal cluster and starts the local one again
@@ -349,11 +349,11 @@ The live VPS deployment itself is deferred (planned as Task 31); the rehearsal a
 
 ### Upgrades and rollback
 
-Each environment is one Helm release, so `helm -n urumi history urumi` lists every revision, and a rollback returns the whole platform to a known-good set of image tags and settings:
+Each environment is one Helm release, so `helm -n ahjin history ahjin` lists every revision, and a rollback returns the whole platform to a known-good set of image tags and settings:
 
 ```sh
-helm -n urumi history urumi
-helm -n urumi rollback urumi <revision> --wait
+helm -n ahjin history ahjin
+helm -n ahjin rollback ahjin <revision> --wait
 ```
 
 Production upgrades use immutable image tags and `helm upgrade --rollback-on-failure` (Helm 4's replacement for `--atomic`), so a release whose pods don't become ready is rolled back automatically. Database migrations follow expand and contract: a release only adds tables and columns, and removals ship a release later, so the previous gateway still works after a rollback. Helm can't undo WooCommerce's own database updates, so take a database backup before upgrading WooCommerce. Details are in [docs/runbooks/upgrade-and-rollback.md](docs/runbooks/upgrade-and-rollback.md).
@@ -377,7 +377,7 @@ It also checks that at least three upstreams are connected and that members neve
 
 ## Security in brief
 
-- **API keys** look like `umcp_<prefix>_<secret>`, are shown once and are stored only as an HMAC-SHA256 with a server-side pepper. Revocation applies to the very next request.
+- **API keys** look like `amcp_<prefix>_<secret>`, are shown once and are stored only as an HMAC-SHA256 with a server-side pepper. Revocation applies to the very next request.
 - **Dashboard sign-in:** scrypt password hashes; an opaque session cookie (HttpOnly, SameSite=Lax, Secure over HTTPS) of which only a hash is stored; login throttling; an anti-CSRF header on every state-changing call.
 - **Upstream credentials** are encrypted at rest with AES-256-GCM and are write-only in the API. Only the gateway sends them, and only to their own server. They never reach a browser or an MCP client.
 - **Client tokens are never passed through** to upstream servers; each upstream receives only its own static credential.
@@ -400,14 +400,14 @@ The full analysis, including what one team member can do to another, is in [docs
 ## Troubleshooting
 
 - **The URLs don't load.** Check the cluster is running (`k3d cluster list`), that nothing else holds port 80 (in PowerShell: `Get-NetTCPConnection -LocalPort 80 -State Listen`) and that nip.io resolves (`nslookup store.127.0.0.1.nip.io`). Offline, use the hosts-file fallback in [docs/local-domains.md](docs/local-domains.md).
-- **A pod is stuck in `CreateContainerConfigError`.** A Secret or key is missing: run `task secrets`, then `kubectl -n urumi describe pod <pod>`.
-- **A pod is stuck in `ImagePullBackOff`.** The image isn't in the local registry: run `task images:build`. Images are pushed to `localhost:5001/…` and pulled as `urumi-registry:5000/…`.
+- **A pod is stuck in `CreateContainerConfigError`.** A Secret or key is missing: run `task secrets`, then `kubectl -n ahjin describe pod <pod>`.
+- **A pod is stuck in `ImagePullBackOff`.** The image isn't in the local registry: run `task images:build`. Images are pushed to `localhost:5001/…` and pulled as `ahjin-registry:5000/…`.
 - **No products, or a "Coming soon" page.** `task store:bootstrap-logs` shows what the bootstrap did; `task deploy:local` runs it again, and it only does what's missing.
 - **The chat says no LLM provider is configured, or keeps failing.** Set `GROQ_API_KEY` (and optionally `GEMINI_API_KEY`) in `.env.local`, then run `task secrets` and `task deploy:local` so the gateway restarts with it.
 - **Only two servers are listed.** The GitHub server is registered only when `GITHUB_MCP_PAT` is set. Set it, then run `task secrets` and `task deploy:local`; the gateway registers it when it starts.
 - **`helm upgrade` fails with a field-ownership conflict naming `kubectl`.** A Helm-managed object was edited by hand with `kubectl edit` or `patch`. Don't do that; recover once with `helm upgrade … --force-conflicts`.
 - **Tools aren't found right after installing them with winget.** Open a new terminal, or restart VS Code if you use its terminal.
-- **Docker or WSL memory is near its limit.** The running stack uses about 2 GB: two k3d nodes at about 0.9 GB each (`docker stats --no-stream`, `kubectl -n urumi top pods`). WSL's memory figure also counts Linux file cache, so sitting near the cap isn't a problem by itself; it is when pods restart with `OOMKilled` or builds crawl. Then build images one at a time (`task image:wordpress`, `task image:node APP=gateway`, …), close other containers, stop the cluster when idle (`k3d cluster stop urumi`), or raise the limit with `memory=` under `[wsl2]` in `%UserProfile%\.wslconfig`, followed by `wsl --shutdown` and a Docker Desktop restart.
+- **Docker or WSL memory is near its limit.** The running stack uses about 2 GB: two k3d nodes at about 0.9 GB each (`docker stats --no-stream`, `kubectl -n ahjin top pods`). WSL's memory figure also counts Linux file cache, so sitting near the cap isn't a problem by itself; it is when pods restart with `OOMKilled` or builds crawl. Then build images one at a time (`task image:wordpress`, `task image:node APP=gateway`, …), close other containers, stop the cluster when idle (`k3d cluster stop ahjin`), or raise the limit with `memory=` under `[wsl2]` in `%UserProfile%\.wslconfig`, followed by `wsl --shutdown` and a Docker Desktop restart.
 
 [docs/BUILD_LOG.md](docs/BUILD_LOG.md#resume-or-debug) has more debugging tips.
 
@@ -418,12 +418,12 @@ Where each optional item from the brief stands. Everything marked "not started" 
 | Item                              | Status                                                                                                                                                                                                                                                                                                                                                                                                                       | Where to look                                                                                          |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Bonus: multi-store provisioning   | Not started. Designed as a `Store` custom resource reconciled by an operator, one namespace per store.                                                                                                                                                                                                                                                                                                                       | Plan, Task 30                                                                                          |
-| 1. Production-like VPS deployment | Partly. Production values (TLS through cert-manager and Let's Encrypt, GHCR images with git-SHA tags, larger volumes and limits), a VPS runbook, and a full production rehearsal over HTTPS on a local cluster. The live VPS is deferred.                                                                                                                                                                                    | `charts/urumi/values-prod.yaml`, `values-rehearsal.yaml`, [docs/runbooks/vps.md](docs/runbooks/vps.md) |
+| 1. Production-like VPS deployment | Partly. Production values (TLS through cert-manager and Let's Encrypt, GHCR images with git-SHA tags, larger volumes and limits), a VPS runbook, and a full production rehearsal over HTTPS on a local cluster. The live VPS is deferred.                                                                                                                                                                                    | `charts/ahjin/values-prod.yaml`, `values-rehearsal.yaml`, [docs/runbooks/vps.md](docs/runbooks/vps.md) |
 | 2. Tool permissions               | Not started.                                                                                                                                                                                                                                                                                                                                                                                                                 | Plan, Task 23                                                                                          |
 | 3. OAuth on the gateway           | Not started.                                                                                                                                                                                                                                                                                                                                                                                                                 | Plan, Task 27                                                                                          |
 | 4. Handling many tools            | Not started. The GitHub upstream uses its issues toolset (10 tools instead of 46) to keep the model's tool list small.                                                                                                                                                                                                                                                                                                       | Plan, Task 26                                                                                          |
 | 5. Hosted MCP servers             | Not started. The generic `mcp-server` sub-chart (no Ingress template, gateway-only NetworkPolicy) is the building block.                                                                                                                                                                                                                                                                                                     | Plan, Task 29                                                                                          |
-| 6. Security hardening             | Partly. Non-root containers with all capabilities dropped (read-only root filesystems for the gateway, dashboard and MCP servers); upstream credentials encrypted at rest; default-deny ingress NetworkPolicies; Host allow-lists on every MCP endpoint against DNS rebinding; no component talks to the Kubernetes API, so there's no RBAC to grant. Not yet: an SSRF guard for admin-entered URLs and default-deny egress. | `charts/urumi`, [docs/threat-model.md](docs/threat-model.md), plan Task 22                             |
+| 6. Security hardening             | Partly. Non-root containers with all capabilities dropped (read-only root filesystems for the gateway, dashboard and MCP servers); upstream credentials encrypted at rest; default-deny ingress NetworkPolicies; Host allow-lists on every MCP endpoint against DNS rebinding; no component talks to the Kubernetes API, so there's no RBAC to grant. Not yet: an SSRF guard for admin-entered URLs and default-deny egress. | `charts/ahjin`, [docs/threat-model.md](docs/threat-model.md), plan Task 22                             |
 | 7. Scaling                        | Not started. The stateless MCP endpoint (ADR-0003) is the groundwork for more than one gateway replica.                                                                                                                                                                                                                                                                                                                      | Plan, Task 25                                                                                          |
 | 8. Observability                  | Partly. The dashboard shows why an upstream is unreachable, failed calls return a clear reason, and the audit log records each call's duration and outcome. Not yet: metrics.                                                                                                                                                                                                                                                | Servers and Audit log pages, plan Task 24                                                              |
 | 9. Upgrades and rollback          | Partly. Runbook, immutable image tags, expand-and-contract migrations, `--rollback-on-failure`, and an upgrade and rollback drill in the rehearsal. Not yet: automatic backups before an upgrade.                                                                                                                                                                                                                            | [docs/runbooks/upgrade-and-rollback.md](docs/runbooks/upgrade-and-rollback.md), plan Task 28           |

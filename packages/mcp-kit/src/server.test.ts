@@ -1,5 +1,5 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
-import { createLogger } from '@urumi/logger';
+import { createLogger } from '@ahjin/logger';
 import http from 'node:http';
 import { Writable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

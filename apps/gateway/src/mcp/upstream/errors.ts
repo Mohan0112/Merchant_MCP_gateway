@@ -1,4 +1,4 @@
-import type { UnreachableReason } from '@urumi/contracts';
+import type { UnreachableReason } from '@ahjin/contracts';
 
 export interface Failure {
   reason: UnreachableReason;

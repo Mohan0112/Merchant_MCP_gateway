@@ -42,15 +42,15 @@ describe('format', () => {
 
 describe('client snippets', () => {
   it('needs only the gateway URL and the key', () => {
-    const snippets = clientSnippets('https://app.example.com/mcp', 'umcp_abc');
+    const snippets = clientSnippets('https://app.example.com/mcp', 'amcp_abc');
     const claude = snippets.find((s) => s.id === 'claude-code')!;
     expect(claude.code).toBe(
-      'claude mcp add --transport http urumi https://app.example.com/mcp --header "Authorization: Bearer umcp_abc"',
+      'claude mcp add --transport http ahjin https://app.example.com/mcp --header "Authorization: Bearer amcp_abc"',
     );
     const cursor = JSON.parse(snippets.find((s) => s.id === 'cursor')!.code);
-    expect(cursor.mcpServers.urumi).toEqual({
+    expect(cursor.mcpServers.ahjin).toEqual({
       url: 'https://app.example.com/mcp',
-      headers: { Authorization: 'Bearer umcp_abc' },
+      headers: { Authorization: 'Bearer amcp_abc' },
     });
   });
 });

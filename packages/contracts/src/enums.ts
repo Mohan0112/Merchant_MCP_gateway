@@ -37,10 +37,10 @@ export const AuditOutcomeSchema = z.enum([
 export type AuditOutcome = z.infer<typeof AuditOutcomeSchema>;
 
 /**
- * Gateway API key: `umcp_` + 8-character lookup prefix + `_` + 43-character base64url secret
- * (32 random bytes). The `umcp_` marker lets secret scanners recognise leaked keys.
+ * Gateway API key: `amcp_` + 8-character lookup prefix + `_` + 43-character base64url secret
+ * (32 random bytes). The `amcp_` marker lets secret scanners recognise leaked keys.
  */
-export const API_KEY_PATTERN = /^umcp_([a-z0-9]{8})_([A-Za-z0-9_-]{43})$/;
+export const API_KEY_PATTERN = /^amcp_([a-z0-9]{8})_([A-Za-z0-9_-]{43})$/;
 
 /** Returns the non-secret lookup prefix of a well-formed key, or null. */
 export function apiKeyPrefix(rawKey: string): string | null {

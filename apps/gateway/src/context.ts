@@ -1,4 +1,4 @@
-import type { Logger } from '@urumi/logger';
+import type { Logger } from '@ahjin/logger';
 import type { Database } from './db/client';
 
 /** Everything a feature module needs, passed explicitly (no globals), so tests can swap any part. */

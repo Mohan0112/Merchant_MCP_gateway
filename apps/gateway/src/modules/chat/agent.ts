@@ -1,4 +1,4 @@
-import type { ChatEvent, ChatMessage } from '@urumi/contracts';
+import type { ChatEvent, ChatMessage } from '@ahjin/contracts';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { slugOf } from '../../mcp/naming';
 import type { LlmMessage, LlmProvider, LlmTool } from './llm';
@@ -49,7 +49,7 @@ export async function runAgent(options: AgentOptions): Promise<void> {
   const maxIterations = options.maxIterations ?? 8;
   const deadline = Date.now() + (options.budgetMs ?? 120_000);
   const client = new Client(
-    { name: 'urumi-chat', version: '0.1.0' },
+    { name: 'ahjin-chat', version: '0.1.0' },
     { versionNegotiation: { mode: 'auto' } },
   );
   let toolCalls = 0;

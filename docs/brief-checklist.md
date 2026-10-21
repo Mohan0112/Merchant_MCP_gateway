@@ -1,6 +1,6 @@
 # Brief checklist
 
-Every requirement of the brief ("Urumi AI FDE Internship, Round 1: MCP Gateway on Kubernetes"), with where it is implemented and how it was verified. Status as of 2026-10-19. ✅ done and verified · 🟡 partly · ⏳ owner's step.
+Every requirement of the brief ("AI FDE Internship, Round 1: MCP Gateway on Kubernetes"), with where it is implemented and how it was verified. Status as of 2026-10-19. ✅ done and verified · 🟡 partly · ⏳ owner's step.
 
 `task dod` is `scripts/dod-check.mjs`, the automated end-to-end check against the running cluster: **19 of 19** on the local cluster with NetworkPolicies on, and **19 of 19 over HTTPS** on the production rehearsal.
 
@@ -9,7 +9,7 @@ Every requirement of the brief ("Urumi AI FDE Internship, Round 1: MCP Gateway o
 | Story | | Where | Verified by |
 |---|---|---|---|
 | See registered MCP servers with status (Connected / Unreachable / Disabled) and their tools | ✅ | Dashboard **Servers** (`apps/dashboard/src/pages/ServersPage.tsx`), status kept by `mcp/upstream/connection.ts` | `task dod` (status and tool counts), UI walkthrough, [screenshot](screenshots/02-servers.png) |
-| The WooCommerce MCP server already registered as the first server | ✅ | First-boot seed `woo` (`charts/urumi/values.yaml` → `modules/servers/seed.ts`) | `task dod`: "WooCommerce MCP server is registered and connected" |
+| The WooCommerce MCP server already registered as the first server | ✅ | First-boot seed `woo` (`charts/ahjin/values.yaml` → `modules/servers/seed.ts`) | `task dod`: "WooCommerce MCP server is registered and connected" |
 | Add another server by URL and credential; edit, disable or remove it | ✅ | **Servers → Add server / Edit / switch / Remove server**; `modules/servers` | Gateway end-to-end tests (`mcp/gateway.test.ts`), UI walkthrough, `task dod` (disable) |
 | Invite team members; issue or revoke their API keys | ✅ | **Members** (invitation links, roles, per-member keys) | Gateway tests; `task dod` invites users A and B through the API and revokes B's key |
 | An audit log of every tool call: who, server and tool, when, how long, success | ✅ | **Audit log** page; `modules/audit` | `task dod` checks A's and B's entries; [screenshot](screenshots/13-audit.png) |
@@ -45,8 +45,8 @@ Every requirement of the brief ("Urumi AI FDE Internship, Round 1: MCP Gateway o
 |---|---|---|---|
 | Runs on local Kubernetes (Kind, k3d or Minikube) | ✅ | k3d (`deploy/k3d/cluster.yaml`) | Everything above |
 | Deployable to a production-like VPS (k3s) with the same Helm charts | 🟡 | `values-prod.yaml`, [runbooks/vps.md](runbooks/vps.md), `task deploy:prod` | Production rehearsal on a fresh single-node k3s with the production values and CI's GHCR images, over HTTPS: `task dod` 19/19. A live VPS is deferred by the owner |
-| Helm only; local and production differences through values files | ✅ | `charts/urumi` with `values-local.yaml`, `values-prod.yaml` (`values-rehearsal.yaml` for the rehearsal) | CI renders both; `task verify:k8s` renders all three |
-| Everything runs in the cluster: store, its database, the WooCommerce MCP server, the gateway, the dashboard | ✅ | One release in namespace `urumi` | `kubectl -n urumi get pods` |
+| Helm only; local and production differences through values files | ✅ | `charts/ahjin` with `values-local.yaml`, `values-prod.yaml` (`values-rehearsal.yaml` for the rehearsal) | CI renders both; `task verify:k8s` renders all three |
+| Everything runs in the cluster: store, its database, the WooCommerce MCP server, the gateway, the dashboard | ✅ | One release in namespace `ahjin` | `kubectl -n ahjin get pods` |
 | Persistent storage for the store's database and WordPress content | ✅ | PVCs `data-mariadb-0` and `wp-uploads` (kept on uninstall); Postgres too | Data survived pod restarts, cluster restarts and the rollback drill |
 | Storefront and dashboard exposed through Ingress with stable URLs; local domain approach documented | ✅ | Ingresses `store` and `app`; [local-domains.md](local-domains.md), [system-design §7.4](system-design.md#74-local-domain-approach) | Used by every check |
 | Readiness and liveness checks on every workload; requests and limits | ✅ | All templates | `task verify:k8s` (CI) fails on any gap; Jobs are bounded by `activeDeadlineSeconds` instead |
@@ -98,7 +98,7 @@ Every requirement of the brief ("Urumi AI FDE Internship, Round 1: MCP Gateway o
 | README: VPS or production-like setup | ✅ | [README → Production-like and VPS setup](../README.md#production-like-and-vps-setup), [runbooks/vps.md](runbooks/vps.md) |
 | README: place an order, connect an external MCP client, use the chat agent | ✅ | [README → Using it](../README.md#using-it) |
 | Source: dashboard, backend and gateway, WooCommerce MCP server, chat agent | ✅ | `apps/dashboard`, `apps/gateway` (chat in `src/modules/chat`), `apps/woo-mcp` |
-| Helm charts and values files (local and production) | ✅ | `charts/urumi` |
+| Helm charts and values files (local and production) | ✅ | `charts/ahjin` |
 | "System design and tradeoffs" note | ✅ | [system-design.md](system-design.md) |
 | Threat model note (shared credentials, no token passthrough, manipulative tool descriptions, member versus member) | ✅ | [threat-model.md](threat-model.md) |
 | Bonus and stand-out items attempted, and where | ✅ | [README → Extras and stand-out items](../README.md#extras-and-stand-out-items) |

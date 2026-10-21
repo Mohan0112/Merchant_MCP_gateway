@@ -1,5 +1,5 @@
-import { closeOnSignals, createMcpHttpServer } from '@urumi/mcp-kit';
-import { createLogger } from '@urumi/logger';
+import { closeOnSignals, createMcpHttpServer } from '@ahjin/mcp-kit';
+import { createLogger } from '@ahjin/logger';
 import { loadConfig } from './config';
 import { buildTools, cachedSettings } from './tools';
 import { WooRestClient } from './woo/rest-client';

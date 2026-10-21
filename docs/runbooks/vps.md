@@ -12,7 +12,7 @@ The VPS runs the **same chart** as the laptop. Only values change: `values-prod.
 | Images | local registry, tag `dev` | `ghcr.io/mohan0112/merchant_mcp_gateway/<app>`, immutable git-SHA tag built by CI (public) |
 | Volumes (`local-path`) | MariaDB 2 Gi, uploads 1 Gi, Postgres 1 Gi | MariaDB 10 Gi, uploads 5 Gi, Postgres 5 Gi |
 | Limits | lean laptop profile | higher (gateway and WordPress 768 Mi, databases 1 Gi) |
-| Secrets | `scripts/secrets.mjs` → `k3d-urumi` | the same script → the VPS context |
+| Secrets | `scripts/secrets.mjs` → `k3d-ahjin` | the same script → the VPS context |
 
 ## What you need
 
@@ -56,12 +56,12 @@ k3s enforces NetworkPolicies with its embedded controller, exactly as k3d does l
 The API port stays closed to the internet; `kubectl` goes through SSH.
 
 ```sh
-scp ubuntu@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/urumi-vps.yaml   # on the VPS first: sudo chmod 644 or copy with sudo
-sed -i 's#https://127.0.0.1:6443#https://127.0.0.1:16443#' ~/.kube/urumi-vps.yaml
+scp ubuntu@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/ahjin-vps.yaml   # on the VPS first: sudo chmod 644 or copy with sudo
+sed -i 's#https://127.0.0.1:6443#https://127.0.0.1:16443#' ~/.kube/ahjin-vps.yaml
 ssh -N -L 16443:127.0.0.1:6443 ubuntu@<vps-ip> &                         # keep this running
-export KUBECONFIG=~/.kube/config:~/.kube/urumi-vps.yaml
-kubectl config rename-context default urumi-vps
-kubectl --context urumi-vps get nodes
+export KUBECONFIG=~/.kube/config:~/.kube/ahjin-vps.yaml
+kubectl config rename-context default ahjin-vps
+kubectl --context ahjin-vps get nodes
 ```
 
 ## 4. DNS
@@ -77,7 +77,7 @@ nslookup store.<name>.duckdns.org
 ## 5. cert-manager
 
 ```sh
-task cert-manager KUBE_CONTEXT=urumi-vps      # pinned version, CRDs included
+task cert-manager KUBE_CONTEXT=ahjin-vps      # pinned version, CRDs included
 ```
 
 The chart renders two ClusterIssuers, `letsencrypt-staging` and `letsencrypt-prod` (HTTP-01 through Traefik). The namespace's default-deny NetworkPolicy admits cert-manager's short-lived solver pods from Traefik, so challenges get through.
@@ -85,7 +85,7 @@ The chart renders two ClusterIssuers, `letsencrypt-staging` and `letsencrypt-pro
 ## 6. Secrets
 
 ```sh
-task secrets CONTEXT=urumi-vps
+task secrets CONTEXT=ahjin-vps
 ```
 
 The same script as locally: it reads `.env.local`, generates database passwords, the credential encryption key, the API-key pepper and the WordPress salts **once** (re-running never rotates them), and never prints values.
@@ -95,15 +95,15 @@ The same script as locally: it reads `.env.local`, generates database passwords,
 `IMAGE_TAG` defaults to the commit at `origin/main`; check in GitHub Actions that the `images` workflow finished for it.
 
 ```sh
-task deploy:prod PROD_CONTEXT=urumi-vps DOMAIN=<name>.duckdns.org LETSENCRYPT_EMAIL=<you@example.com> ISSUER=letsencrypt-staging
-kubectl --context urumi-vps -n urumi get certificate      # READY True for app-tls and store-tls
+task deploy:prod PROD_CONTEXT=ahjin-vps DOMAIN=<name>.duckdns.org LETSENCRYPT_EMAIL=<you@example.com> ISSUER=letsencrypt-staging
+kubectl --context ahjin-vps -n ahjin get certificate      # READY True for app-tls and store-tls
 ```
 
 Staging certificates aren't trusted by browsers, but staging's rate limits are generous, so mistakes are cheap. Once both are ready, switch to the production issuer:
 
 ```sh
-task deploy:prod PROD_CONTEXT=urumi-vps DOMAIN=<name>.duckdns.org LETSENCRYPT_EMAIL=<you@example.com>
-kubectl --context urumi-vps -n urumi delete secret app-tls store-tls     # make cert-manager reissue from letsencrypt-prod
+task deploy:prod PROD_CONTEXT=ahjin-vps DOMAIN=<name>.duckdns.org LETSENCRYPT_EMAIL=<you@example.com>
+kubectl --context ahjin-vps -n ahjin delete secret app-tls store-tls     # make cert-manager reissue from letsencrypt-prod
 ```
 
 `task deploy:prod` runs `helm upgrade --install … --wait --rollback-on-failure`, so a release whose pods don't become ready is rolled back automatically.
@@ -111,13 +111,13 @@ kubectl --context urumi-vps -n urumi delete secret app-tls store-tls     # make 
 ## 8. Verify
 
 ```sh
-task dod CONTEXT=urumi-vps -- --domain=<name>.duckdns.org --scheme=https
+task dod CONTEXT=ahjin-vps -- --domain=<name>.duckdns.org --scheme=https
 ```
 
-Then sign in at `https://app.<domain>`. The first admin's login is in the cluster (`task logins` reads the current context; or `kubectl --context urumi-vps -n urumi get secret gateway-bootstrap-admin -o jsonpath='{.data.password}' | base64 -d`), and the first sign-in forces a new password. Create an API key and connect Claude Code:
+Then sign in at `https://app.<domain>`. The first admin's login is in the cluster (`task logins` reads the current context; or `kubectl --context ahjin-vps -n ahjin get secret gateway-bootstrap-admin -o jsonpath='{.data.password}' | base64 -d`), and the first sign-in forces a new password. Create an API key and connect Claude Code:
 
 ```sh
-claude mcp add --transport http urumi https://app.<domain>/mcp --header "Authorization: Bearer <key>"
+claude mcp add --transport http ahjin https://app.<domain>/mcp --header "Authorization: Bearer <key>"
 ```
 
 ## 9. Upgrades, rollback and backups
@@ -126,15 +126,15 @@ claude mcp add --transport http urumi https://app.<domain>/mcp --header "Authori
 - Backups are not automated yet (plan Task 28). Before risky upgrades, take dumps by hand:
 
   ```sh
-  kubectl --context urumi-vps -n urumi exec mariadb-0 -- sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction wordpress' > wordpress.sql
-  kubectl --context urumi-vps -n urumi exec postgres-0 -- pg_dump -U urumi urumi > urumi.sql
+  kubectl --context ahjin-vps -n ahjin exec mariadb-0 -- sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction wordpress' > wordpress.sql
+  kubectl --context ahjin-vps -n ahjin exec postgres-0 -- pg_dump -U ahjin ahjin > ahjin.sql
   ```
 
 ## Troubleshooting
 
-- **Certificate stays not ready:** `kubectl -n urumi describe certificate app-tls`, then `kubectl -n urumi get challenges` and describe the challenge. Usually port 80 isn't reachable from the internet (firewall or security list) or DNS doesn't point at the VPS yet.
+- **Certificate stays not ready:** `kubectl -n ahjin describe certificate app-tls`, then `kubectl -n ahjin get challenges` and describe the challenge. Usually port 80 isn't reachable from the internet (firewall or security list) or DNS doesn't point at the VPS yet.
 - **`ImagePullBackOff`:** the tag wasn't built (check the `images` workflow for that commit) or a package was made private.
-- **404 from Traefik:** the host name doesn't match the Ingress; check `global.domain` (`helm --kube-context urumi-vps -n urumi get values urumi`).
+- **404 from Traefik:** the host name doesn't match the Ingress; check `global.domain` (`helm --kube-context ahjin-vps -n ahjin get values ahjin`).
 - **Pods `Pending`:** the node is out of memory or CPU (`kubectl describe pod`); a 2 GB VPS is too small.
 
 ## Production rehearsal on a laptop
@@ -142,7 +142,7 @@ claude mcp add --transport http urumi https://app.<domain>/mcp --header "Authori
 The commands above were rehearsed locally on a fresh single-node k3s cluster with the production values. Only `values-rehearsal.yaml` differs: nip.io instead of a public domain, and a self-signed issuer instead of Let's Encrypt (which can't reach a laptop).
 
 ```sh
-task rehearsal:up       # stops the local cluster; creates k3d cluster urumi-rehearsal; installs cert-manager
+task rehearsal:up       # stops the local cluster; creates k3d cluster ahjin-rehearsal; installs cert-manager
 task rehearsal:deploy   # secrets, then helm upgrade --install with values-prod.yaml + values-rehearsal.yaml and CI's GHCR images
 task rehearsal:dod      # the definition-of-done check over HTTPS (--insecure: self-signed certificates)
 task rehearsal:down     # deletes the rehearsal cluster and starts the local one again

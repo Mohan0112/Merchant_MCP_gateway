@@ -1,4 +1,4 @@
-import type { Logger } from '@urumi/logger';
+import type { Logger } from '@ahjin/logger';
 import {
   toOrderDetail,
   toOrderSummary,

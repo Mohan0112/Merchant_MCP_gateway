@@ -22,10 +22,10 @@ With database access you can also filter by the key itself:
 
 ```sh
 echo "select occurred_at, server_slug, tool_name, outcome from audit_logs where api_key_id = (select id from api_keys where prefix = '<8-char prefix>') order by occurred_at desc limit 50;" \
-  | kubectl -n urumi exec -i postgres-0 -- psql -U urumi -d urumi
+  | kubectl -n ahjin exec -i postgres-0 -- psql -U ahjin -d ahjin
 ```
 
-The prefix is the part after `umcp_` shown in the key list (`umcp_<prefix>_…`).
+The prefix is the part after `amcp_` shown in the key list (`amcp_<prefix>_…`).
 
 ## 3. Repair and follow up
 

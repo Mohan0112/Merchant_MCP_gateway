@@ -8,7 +8,7 @@ global:
 store:
   wordpress:
     image:
-      repository: urumi-registry:5000/urumi-wordpress
+      repository: ahjin-registry:5000/ahjin-wordpress
       tag: dev
       pullPolicy: Always
     environmentType: local
@@ -24,11 +24,11 @@ fx-mcp:
 platform:
   gateway:
     image:
-      repository: urumi-registry:5000/urumi-gateway
+      repository: ahjin-registry:5000/ahjin-gateway
       tag: dev
       pullPolicy: Always
   dashboard:
     image:
-      repository: urumi-registry:5000/urumi-dashboard
+      repository: ahjin-registry:5000/ahjin-dashboard
       tag: dev
       pullPolicy: Always

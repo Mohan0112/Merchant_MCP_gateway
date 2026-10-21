@@ -11,7 +11,7 @@ kind: ClusterIssuer
 metadata:
   name: {{ .selfSigned.name }}
   labels:
-    {{- include "urumi.labels" $ | nindent 4 }}
+    {{- include "ahjin.labels" $ | nindent 4 }}
 spec:
   selfSigned: {}
 {{- end }}
@@ -28,7 +28,7 @@ kind: ClusterIssuer
 metadata:
   name: {{ $issuer.name }}
   labels:
-    {{- include "urumi.labels" $ | nindent 4 }}
+    {{- include "ahjin.labels" $ | nindent 4 }}
 spec:
   acme:
     server: {{ $issuer.server }}

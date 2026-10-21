@@ -8,7 +8,7 @@ kind: NetworkPolicy
 metadata:
   name: default-deny-ingress
   labels:
-    {{- include "urumi.labels" . | nindent 4 }}
+    {{- include "ahjin.labels" . | nindent 4 }}
 spec:
   podSelector: {}
   policyTypes: [Ingress]
@@ -22,7 +22,7 @@ kind: NetworkPolicy
 metadata:
   name: acme-http01-solver
   labels:
-    {{- include "urumi.labels" . | nindent 4 }}
+    {{- include "ahjin.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:

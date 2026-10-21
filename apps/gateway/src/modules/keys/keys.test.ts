@@ -10,14 +10,14 @@ let memberId: string;
 
 beforeEach(async () => {
   h = await createHarness();
-  await bootstrapAdmin(h.ctx, 'admin@urumi.test', 'initial-admin-password');
+  await bootstrapAdmin(h.ctx, 'admin@ahjin.test', 'initial-admin-password');
   admin = new Browser(h.app);
-  await admin.login('admin@urumi.test', 'initial-admin-password');
+  await admin.login('admin@ahjin.test', 'initial-admin-password');
   await admin.request('POST', '/api/auth/password', {
     currentPassword: 'initial-admin-password',
     newPassword: 'a-new-admin-password',
   });
-  const invite = await admin.request('POST', '/api/invitations', { email: 'bob@urumi.test' });
+  const invite = await admin.request('POST', '/api/invitations', { email: 'bob@ahjin.test' });
   const token = new URL(invite.json().invitation.link).pathname.split('/').pop()!;
   member = new Browser(h.app);
   memberId = (
@@ -37,7 +37,7 @@ describe.skipIf(!databaseUrl)('API keys', () => {
     expect(res.statusCode).toBe(201);
     expect(res.headers['cache-control']).toBe('no-store');
     const { key } = res.json().key as { key: string; prefix: string };
-    expect(key).toMatch(/^umcp_[a-z0-9]{8}_[A-Za-z0-9_-]{43}$/);
+    expect(key).toMatch(/^amcp_[a-z0-9]{8}_[A-Za-z0-9_-]{43}$/);
 
     const listed = (await member.request('GET', '/api/api-keys')).json().keys;
     expect(listed).toHaveLength(1);

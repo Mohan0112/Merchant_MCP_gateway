@@ -6,12 +6,12 @@ How the Merchant MCP Gateway is built and why: the architecture, how tools are a
 
 ## 1. Architecture
 
-Everything runs in one namespace, `urumi`, installed as one Helm release. Every tool call, from the chat agent or from an external MCP client, goes through the gateway's single `/mcp` endpoint; nothing else talks to the upstream MCP servers.
+Everything runs in one namespace, `ahjin`, installed as one Helm release. Every tool call, from the chat agent or from an external MCP client, goes through the gateway's single `/mcp` endpoint; nothing else talks to the upstream MCP servers.
 
 | Component | Runs as | Responsibility | Code |
 |---|---|---|---|
-| `wordpress` | Deployment | Storefront, cash-on-delivery checkout, wp-admin. WooCommerce is the system of record for products and orders | `docker/wordpress`, `charts/urumi/charts/store` |
-| `mariadb` | StatefulSet | Store database | `charts/urumi/charts/store` |
+| `wordpress` | Deployment | Storefront, cash-on-delivery checkout, wp-admin. WooCommerce is the system of record for products and orders | `docker/wordpress`, `charts/ahjin/charts/store` |
+| `mariadb` | StatefulSet | Store database | `charts/ahjin/charts/store` |
 | `store-bootstrap`, `wp-cron` | Job (Helm hook), CronJob | Idempotent store setup (WooCommerce, COD, `mcp-bot` user and REST key, the laptop catalogue with photos, the Ahjin theme); scheduled WordPress tasks | `docker/wordpress/bootstrap.sh` |
 | `woo-mcp` | Deployment | Our WooCommerce MCP server: 6 tools plus `server_info` | `apps/woo-mcp` |
 | `fx-mcp` | Deployment | Our currency MCP server: 3 tools plus `server_info`; live rates with a built-in fallback table | `apps/fx-mcp` |
@@ -29,7 +29,7 @@ flowchart LR
 
     subgraph k8s["Kubernetes: k3d locally, k3s on a VPS"]
         traefik["Traefik ingress<br/>namespace kube-system"]
-        subgraph ns["namespace urumi, Helm release urumi"]
+        subgraph ns["namespace ahjin, Helm release ahjin"]
             dash["dashboard<br/>nginx + React SPA"]
             subgraph gwpod["gateway pod"]
                 api["REST API /api"]
@@ -99,7 +99,7 @@ flowchart LR
 
 **How.** `woo-mcp` calls the **WooCommerce REST API v3** on the in-cluster Service, `http://wordpress:8080/wp-json/wc/v3/...`:
 - **Identity:** a dedicated WordPress user `mcp-bot` with the `shop_manager` role (products and orders, but no plugins, users or settings). The bootstrap Job creates it and stores its REST key from Secret `store-woo-api`, hashed with WooCommerce's own `wc_api_hash()`, so the Job needs no Kubernetes API access.
-- **Authentication:** HTTP Basic Auth with the consumer key and secret. WooCommerce accepts Basic Auth only on HTTPS, so a must-use plugin baked into the store image (`docker/wordpress/mu-plugins/urumi-internal-https.php`) marks a request as HTTPS only when its `Host` is the internal Service name (`URUMI_INTERNAL_HOST=wordpress`). Outside traffic can't arrive with that host: Traefik routes only `store.<domain>` to WordPress, and NetworkPolicy admits only Traefik and `woo-mcp`. In the cluster, the same key with the public `Host` gets 401.
+- **Authentication:** HTTP Basic Auth with the consumer key and secret. WooCommerce accepts Basic Auth only on HTTPS, so a must-use plugin baked into the store image (`docker/wordpress/mu-plugins/ahjin-internal-https.php`) marks a request as HTTPS only when its `Host` is the internal Service name (`AHJIN_INTERNAL_HOST=wordpress`). Outside traffic can't arrive with that host: Traefik routes only `store.<domain>` to WordPress, and NetworkPolicy admits only Traefik and `woo-mcp`. In the cluster, the same key with the public `Host` gets 401.
 - **Behaviour:** 10 s timeout per request; GETs retried twice with backoff, writes never retried (no duplicate products); WooCommerce errors classified into `isError` messages the model can act on ("Order 99999 not found."); links rewritten to the public store URL; list views without addresses or contact details; `period: today` resolved to exact UTC bounds in the store's timezone, so the model never does date maths.
 
 **Why.**
@@ -142,7 +142,7 @@ Two servers may expose a tool with the same name, so every tool is exposed as **
 ### 3.3 Routing a call
 
 1. Traefik routes `app.<domain>/mcp` to the gateway. The `Host` header must be on the allow-list (public host, in-cluster Service names, loopback), otherwise 403 (DNS-rebinding protection).
-2. The bearer token is checked: a `uchat_` token against the in-memory chat tokens, anything else as an API key. A failure is HTTP 401.
+2. The bearer token is checked: a `achat_` token against the in-memory chat tokens, anything else as an API key. A failure is HTTP 401.
 3. `createMcpHandler` builds a fresh MCP server for this request, bound to the caller. `tools/call` runs `invokeTool()` (`mcp/invoke.ts`).
 4. `invokeTool()` resolves the exposed name in the snapshot. If it isn't there, it explains a disabled or unreachable server, or returns JSON-RPC error -32602 for an unknown tool. A permission hook sits next (a no-op in the core; per-tool rules are Phase 2).
 5. The call goes to that server's connection with the **original** tool name, the server's own timeout and its own credential. The caller's key never leaves the gateway.
@@ -160,7 +160,7 @@ sequenceDiagram
     participant S as WordPress REST API
     participant D as MariaDB
 
-    B->>T: POST /mcp, tools/call woo__list_orders period=today, Bearer umcp_...
+    B->>T: POST /mcp, tools/call woo__list_orders period=today, Bearer amcp_...
     T->>G: forward (TLS ends at Traefik in production)
     G->>G: Host header on the allow-list
     G->>P: find the API key by its prefix
@@ -246,9 +246,9 @@ Reconnect attempts keep a server **unreachable** until one succeeds, so its stat
 
 | Caller | Credential | Stored as | Lifetime |
 |---|---|---|---|
-| Dashboard user | Email and password, then an opaque `urumi_session` cookie (HttpOnly, SameSite=Lax, Secure on https) | Password: scrypt (N=2^15, r=8, p=3, per-user salt). Session: SHA-256 of the token | 12 h idle, 7 days absolute |
-| MCP client | API key `umcp_<8-char prefix>_<43-char secret>` as a bearer token | Prefix in clear for lookup and display; HMAC-SHA256 of the key with a server-side pepper (Secret `gateway-crypto`) | Until revoked; optional expiry of 1 to 365 days |
-| Chat module | `uchat_` token, 32 random bytes | SHA-256 in an in-memory map, bound to the user and their dashboard session | 5 minutes, and revoked when the chat turn ends |
+| Dashboard user | Email and password, then an opaque `ahjin_session` cookie (HttpOnly, SameSite=Lax, Secure on https) | Password: scrypt (N=2^15, r=8, p=3, per-user salt). Session: SHA-256 of the token | 12 h idle, 7 days absolute |
+| MCP client | API key `amcp_<8-char prefix>_<43-char secret>` as a bearer token | Prefix in clear for lookup and display; HMAC-SHA256 of the key with a server-side pepper (Secret `gateway-crypto`) | Until revoked; optional expiry of 1 to 365 days |
+| Chat module | `achat_` token, 32 random bytes | SHA-256 in an in-memory map, bound to the user and their dashboard session | 5 minutes, and revoked when the chat turn ends |
 | Gateway to an upstream | Static bearer token or custom header | AES-256-GCM, key in Secret `gateway-crypto`; write-only in the API | Until an admin replaces it |
 
 - **API keys** are shown once (`Cache-Control: no-store`), limited to 10 active per user, and revocable by their owner or an admin. Every request re-checks the key in the database (no cache), so revocation applies to the very next request. Disabling a user revokes their keys and ends their sessions.
@@ -321,7 +321,7 @@ The long-running pods add up to about 2.4 GiB of memory limits and under 1 GiB o
 
 ### 7.2 NetworkPolicies
 
-A namespace-wide policy denies all ingress to every pod in `urumi`; allow rules then open only the paths the system uses. k3s enforces them with its built-in policy controller, locally and in production.
+A namespace-wide policy denies all ingress to every pod in `ahjin`; allow rules then open only the paths the system uses. k3s enforces them with its built-in policy controller, locally and in production.
 
 | Pods | Accept connections only from |
 |---|---|
@@ -362,7 +362,7 @@ Every public host is built from `global.domain`. Locally it's `127.0.0.1.nip.io`
 app.127.0.0.1.nip.io → DNS answers 127.0.0.1 → laptop port 80 → k3d load balancer → Traefik → Service → Pod
 ```
 
-- **Offline:** add `127.0.0.1 store.urumi.test app.urumi.test` to the hosts file and deploy with `--set global.domain=urumi.test`. If port 80 is taken, change the host port in `deploy/k3d/cluster.yaml` and add it to the URLs.
+- **Offline:** add `127.0.0.1 store.ahjin.test app.ahjin.test` to the hosts file and deploy with `--set global.domain=ahjin.test`. If port 80 is taken, change the host port in `deploy/k3d/cluster.yaml` and add it to the URLs.
 - **Inside the cluster** pods use Service names (`http://wordpress:8080`, `http://woo-mcp:8080/mcp`), so nothing internal depends on nip.io.
 - **Streaming:** the chart sets Traefik's read and write timeouts to none (idle timeout 600 s) through a k3s `HelmChartConfig`, so SSE streams (`/mcp` change subscriptions, `/api/chat`) aren't cut after Traefik's default 60 s.
 
@@ -376,15 +376,15 @@ The same chart is used everywhere; only values differ (`values-local.yaml`, `val
 |---|---|---|
 | Domain and DNS | `127.0.0.1.nip.io`, wildcard DNS to loopback | A real domain (for example a DuckDNS name) whose `store.` and `app.` hosts point at the VPS |
 | Ingress and TLS | k3s's Traefik, plain HTTP | Same Traefik and Ingress objects. `global.tls` adds TLS sections and the cert-manager annotation; Let's Encrypt issues certificates through a ClusterIssuer the chart renders. Cookies become `Secure`, and WordPress sees https through `X-Forwarded-Proto` |
-| Images | `urumi-registry:5000/urumi-<app>:dev`, pulled `Always` | `ghcr.io/mohan0112/merchant_mcp_gateway/<app>` with an immutable git-SHA tag, built and pushed by CI (`images.yml`) |
+| Images | `ahjin-registry:5000/ahjin-<app>:dev`, pulled `Always` | `ghcr.io/mohan0112/merchant_mcp_gateway/<app>` with an immutable git-SHA tag, built and pushed by CI (`images.yml`) |
 | Storage class and sizes | Cluster default (`local-path`); MariaDB 2 Gi, uploads 1 Gi, PostgreSQL 1 Gi | `persistence.storageClass` per volume (empty means the cluster default; a block-storage CSI class on a cloud VPS); MariaDB 10 Gi, uploads 5 Gi, PostgreSQL 5 Gi |
 | Resources | §7.1 | Higher limits for WordPress, MariaDB, the gateway and PostgreSQL |
-| Secrets | `task secrets` against `k3d-urumi` | The same script with `--context` set to the VPS cluster, from that machine's `.env.local` |
+| Secrets | `task secrets` against `k3d-ahjin` | The same script with `--context` set to the VPS cluster, from that machine's `.env.local` |
 | Log level | `debug` | `info` |
 
-**Production rehearsal.** The live VPS is Phase 2, so Task 19 proves the production values on the laptop: `values-rehearsal.yaml` runs them on a second k3d cluster, `urumi-rehearsal`, with a self-signed issuer instead of Let's Encrypt. `task rehearsal:up` and `rehearsal:deploy` create and deploy it, `rehearsal:dod` runs the definition of done over HTTPS (19 of 19 on 2026-10-19, with the images CI pushed to GHCR), an upgrade and a `helm rollback` drill follow (a broken upgrade was rolled back automatically while the gateway kept answering), and `rehearsal:down` deletes it. Production and rehearsal differ only in the domain and the certificate issuer. A real VPS follows [runbooks/vps.md](runbooks/vps.md) and deploys with `task deploy:prod`.
+**Production rehearsal.** The live VPS is Phase 2, so Task 19 proves the production values on the laptop: `values-rehearsal.yaml` runs them on a second k3d cluster, `ahjin-rehearsal`, with a self-signed issuer instead of Let's Encrypt. `task rehearsal:up` and `rehearsal:deploy` create and deploy it, `rehearsal:dod` runs the definition of done over HTTPS (19 of 19 on 2026-10-19, with the images CI pushed to GHCR), an upgrade and a `helm rollback` drill follow (a broken upgrade was rolled back automatically while the gateway kept answering), and `rehearsal:down` deletes it. Production and rehearsal differ only in the domain and the certificate issuer. A real VPS follows [runbooks/vps.md](runbooks/vps.md) and deploys with `task deploy:prod`.
 
-**Upgrade and rollback.** The platform is one release, so `helm history urumi` lists every revision with its image tags and values. An upgrade changes image tags (git SHAs) or values and runs `helm upgrade --rollback-on-failure --wait` (Helm 4's replacement for `--atomic`), which rolls back on its own if pods don't become ready. A problem found later is undone with `helm rollback urumi <revision> --wait`. That's safe for the gateway because migrations only add. The store bootstrap hook re-runs on every upgrade and changes nothing that's already in place, but WooCommerce's own database updates can't be undone by Helm, so back up the store database before upgrading WooCommerce. Steps: [runbooks/upgrade-and-rollback.md](runbooks/upgrade-and-rollback.md).
+**Upgrade and rollback.** The platform is one release, so `helm history ahjin` lists every revision with its image tags and values. An upgrade changes image tags (git SHAs) or values and runs `helm upgrade --rollback-on-failure --wait` (Helm 4's replacement for `--atomic`), which rolls back on its own if pods don't become ready. A problem found later is undone with `helm rollback ahjin <revision> --wait`. That's safe for the gateway because migrations only add. The store bootstrap hook re-runs on every upgrade and changes nothing that's already in place, but WooCommerce's own database updates can't be undone by Helm, so back up the store database before upgrading WooCommerce. Steps: [runbooks/upgrade-and-rollback.md](runbooks/upgrade-and-rollback.md).
 
 ## 9. Trade-offs and known limitations
 

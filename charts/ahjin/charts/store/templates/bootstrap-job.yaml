@@ -1,4 +1,4 @@
-# Idempotent store setup after every install and upgrade (urumi-bootstrap in the store image).
+# Idempotent store setup after every install and upgrade (ahjin-bootstrap in the store image).
 # Kept after success so its logs stay available for debugging; replaced at the next upgrade.
 # Like the wp-cron CronJob, it has no probes: readiness and liveness apply to long-running pods,
 # while this one runs to completion and activeDeadlineSeconds bounds how long it may take.
@@ -30,7 +30,7 @@ spec:
         - name: bootstrap
           image: "{{ .Values.wordpress.image.repository }}:{{ .Values.wordpress.image.tag }}"
           imagePullPolicy: {{ .Values.wordpress.image.pullPolicy }}
-          command: [urumi-bootstrap]
+          command: [ahjin-bootstrap]
           env:
             {{- include "store.wordpressEnv" . | nindent 12 }}
             {{- include "store.bootstrapEnv" . | nindent 12 }}

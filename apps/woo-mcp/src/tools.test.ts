@@ -1,4 +1,4 @@
-import { ToolError, type ToolHandler } from '@urumi/mcp-kit';
+import { ToolError, type ToolHandler } from '@ahjin/mcp-kit';
 import { describe, expect, it } from 'vitest';
 import { buildTools } from './tools';
 import {

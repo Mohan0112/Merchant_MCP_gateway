@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Store bootstrap, run by a Helm post-install/post-upgrade hook Job (and the wp-cron CronJob).
 #
-#   urumi-bootstrap          install and configure the store (idempotent: safe on every upgrade)
-#   urumi-bootstrap cron     run due WP-Cron events (DISABLE_WP_CRON is on in wp-config)
+#   ahjin-bootstrap          install and configure the store (idempotent: safe on every upgrade)
+#   ahjin-bootstrap cron     run due WP-Cron events (DISABLE_WP_CRON is on in wp-config)
 #
 # Every step checks before it acts, so re-running changes nothing when the store is already set up.
 set -euo pipefail
@@ -108,7 +108,7 @@ log "WooCommerce pages ensured"
 if wp user get "$MCP_USER" --field=ID >/dev/null 2>&1; then
   wp user set-role "$MCP_USER" shop_manager >/dev/null
 else
-  wp user create "$MCP_USER" "mcp-bot@urumi.local" --role=shop_manager \
+  wp user create "$MCP_USER" "mcp-bot@ahjin.local" --role=shop_manager \
     --user_pass="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')" >/dev/null
   log "created user $MCP_USER (shop_manager)"
 fi
@@ -119,10 +119,10 @@ wp eval '
   $user  = get_user_by("login", "mcp-bot");
   $ck    = getenv("WOO_CONSUMER_KEY");
   $cs    = getenv("WOO_CONSUMER_SECRET");
-  $wpdb->delete($table, ["user_id" => $user->ID, "description" => "urumi-mcp"]);
+  $wpdb->delete($table, ["user_id" => $user->ID, "description" => "ahjin-mcp"]);
   $wpdb->insert($table, [
     "user_id"         => $user->ID,
-    "description"     => "urumi-mcp",
+    "description"     => "ahjin-mcp",
     "permissions"     => "read_write",
     "consumer_key"    => wc_api_hash($ck),
     "consumer_secret" => $cs,

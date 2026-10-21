@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Logger } from '@urumi/logger';
+import type { Logger } from '@ahjin/logger';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import { AppError, problemHandler } from './lib/errors';
 

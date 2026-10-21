@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Browser, createHarness, databaseUrl, type Harness } from '../../test/harness';
 import { bootstrapAdmin } from './users';
 
-const ADMIN = { email: 'admin@urumi.test', password: 'initial-admin-password' };
+const ADMIN = { email: 'admin@ahjin.test', password: 'initial-admin-password' };
 let h: Harness;
 const clock = { now: new Date('2026-10-15T10:00:00Z') };
 
@@ -27,7 +27,7 @@ async function adminBrowser() {
 
 describe.skipIf(!databaseUrl)('authentication', () => {
   it('creates the bootstrap admin only once', async () => {
-    expect(await bootstrapAdmin(h.ctx, 'other@urumi.test', 'another-password')).toBe(false);
+    expect(await bootstrapAdmin(h.ctx, 'other@ahjin.test', 'another-password')).toBe(false);
     const { rows } = await h.pool.query('select email, role, must_change_password from users');
     expect(rows).toEqual([{ email: ADMIN.email, role: 'admin', must_change_password: true }]);
   });
@@ -35,7 +35,7 @@ describe.skipIf(!databaseUrl)('authentication', () => {
   it('gives the same answer for a wrong password and an unknown email', async () => {
     const browser = new Browser(h.app);
     const wrong = await browser.login(ADMIN.email, 'not-the-password');
-    const unknown = await browser.login('nobody@urumi.test', 'whatever-password');
+    const unknown = await browser.login('nobody@ahjin.test', 'whatever-password');
     expect(wrong.statusCode).toBe(401);
     expect(unknown.statusCode).toBe(401);
     expect(wrong.json().detail).toBe(unknown.json().detail);
@@ -44,10 +44,10 @@ describe.skipIf(!databaseUrl)('authentication', () => {
   it('sets an httpOnly SameSite=Lax session cookie and stores only its hash', async () => {
     const res = await new Browser(h.app).login(ADMIN.email, ADMIN.password);
     const cookie = String(res.headers['set-cookie']);
-    expect(cookie).toMatch(/urumi_session=/);
+    expect(cookie).toMatch(/ahjin_session=/);
     expect(cookie).toMatch(/HttpOnly/);
     expect(cookie).toMatch(/SameSite=Lax/);
-    const token = /urumi_session=([^;]+)/.exec(cookie)![1]!;
+    const token = /ahjin_session=([^;]+)/.exec(cookie)![1]!;
     const { rows } = await h.pool.query('select token_hash from sessions');
     expect(rows[0].token_hash).not.toContain(token);
   });
@@ -104,10 +104,10 @@ describe.skipIf(!databaseUrl)('invitations and team management', () => {
 
   it('lets an invitee create an account once, then signs them in as a member', async () => {
     const admin = await adminBrowser();
-    const token = await invite(admin, 'Asha@Urumi.test');
+    const token = await invite(admin, 'Asha@Ahjin.test');
 
     const preview = await new Browser(h.app).request('GET', `/api/invitations/accept/${token}`);
-    expect(preview.json().invitation).toMatchObject({ email: 'asha@urumi.test', role: 'member' });
+    expect(preview.json().invitation).toMatchObject({ email: 'asha@ahjin.test', role: 'member' });
 
     const asha = new Browser(h.app);
     const accepted = await asha.request('POST', `/api/invitations/accept/${token}`, {
@@ -129,7 +129,7 @@ describe.skipIf(!databaseUrl)('invitations and team management', () => {
 
   it('rejects expired invitations', async () => {
     const admin = await adminBrowser();
-    const token = await invite(admin, 'late@urumi.test');
+    const token = await invite(admin, 'late@ahjin.test');
     clock.now = new Date(clock.now.getTime() + 73 * 60 * 60 * 1000);
     expect(
       (await new Browser(h.app).request('GET', `/api/invitations/accept/${token}`)).statusCode,
@@ -138,7 +138,7 @@ describe.skipIf(!databaseUrl)('invitations and team management', () => {
 
   it('keeps members out of admin routes', async () => {
     const admin = await adminBrowser();
-    const token = await invite(admin, 'member@urumi.test');
+    const token = await invite(admin, 'member@ahjin.test');
     const member = new Browser(h.app);
     await member.request('POST', `/api/invitations/accept/${token}`, {
       name: 'M',
@@ -146,7 +146,7 @@ describe.skipIf(!databaseUrl)('invitations and team management', () => {
     });
     expect((await member.request('GET', '/api/users')).statusCode).toBe(403);
     expect(
-      (await member.request('POST', '/api/invitations', { email: 'x@urumi.test' })).statusCode,
+      (await member.request('POST', '/api/invitations', { email: 'x@ahjin.test' })).statusCode,
     ).toBe(403);
   });
 
@@ -161,7 +161,7 @@ describe.skipIf(!databaseUrl)('invitations and team management', () => {
 
   it('disabling a member ends their sessions immediately', async () => {
     const admin = await adminBrowser();
-    const token = await invite(admin, 'leaver@urumi.test');
+    const token = await invite(admin, 'leaver@ahjin.test');
     const leaver = new Browser(h.app);
     const created = await leaver.request('POST', `/api/invitations/accept/${token}`, {
       name: 'Leaver',
@@ -173,7 +173,7 @@ describe.skipIf(!databaseUrl)('invitations and team management', () => {
     ).toBe(200);
     expect((await leaver.request('GET', '/api/auth/me')).statusCode).toBe(401);
     expect(
-      (await new Browser(h.app).login('leaver@urumi.test', 'leavers-password')).statusCode,
+      (await new Browser(h.app).login('leaver@ahjin.test', 'leavers-password')).statusCode,
     ).toBe(401);
   });
 });

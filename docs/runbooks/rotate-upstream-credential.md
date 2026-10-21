@@ -18,12 +18,12 @@ These servers read their expected credential from a Secret at startup (`woo-mcp-
 1. Generate a new value and restart the server so it accepts only that value:
    ```sh
    node scripts/secrets.mjs --recreate=fx-mcp-auth          # add --context=<ctx> for another cluster
-   kubectl -n urumi rollout restart deployment/fx-mcp
+   kubectl -n ahjin rollout restart deployment/fx-mcp
    ```
    The server is now Unreachable in the dashboard with reason **Credential rejected**, because the gateway still sends the old value.
 2. Copy the new value **without printing it to the screen**, straight into the clipboard:
    ```sh
-   kubectl -n urumi get secret fx-mcp-auth -o jsonpath='{.data.api-key}' | base64 -d | clip    # Windows; pbcopy on macOS
+   kubectl -n ahjin get secret fx-mcp-auth -o jsonpath='{.data.api-key}' | base64 -d | clip    # Windows; pbcopy on macOS
    ```
 3. Dashboard → **Servers** → **fx** → **Edit** → paste into **Credential** → **Test connection** → **Save changes**. The card returns to **Connected**.
 

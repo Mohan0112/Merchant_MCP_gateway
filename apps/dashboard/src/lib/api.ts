@@ -13,7 +13,7 @@ import type {
   ToolInfo,
   UpdateServerRequest,
   User,
-} from '@urumi/contracts';
+} from '@ahjin/contracts';
 
 export interface FieldError {
   field: string;

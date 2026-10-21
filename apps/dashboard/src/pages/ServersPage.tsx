@@ -1,4 +1,4 @@
-import type { Server, TestConnectionResult, ToolInfo, UpstreamAuthType } from '@urumi/contracts';
+import type { Server, TestConnectionResult, ToolInfo, UpstreamAuthType } from '@ahjin/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useIsAdmin } from '../auth';

@@ -45,7 +45,7 @@ async function authenticate(
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
   if (!token) return { ok: false, description: 'Missing bearer token', channel: 'mcp_client' };
 
-  if (token.startsWith('uchat_')) {
+  if (token.startsWith('achat_')) {
     const claims = deps.chatTokens.verify(token);
     if (!claims) return { ok: false, description: 'Chat token expired', channel: 'chat_agent' };
     const user = await findUserById(deps.ctx, claims.userId);
@@ -99,7 +99,7 @@ export function registerMcpEndpoint(
       const principal = authInfo?.extra?.principal as McpPrincipal;
       const requestId = String(authInfo?.extra?.requestId ?? '');
       const server = new Server(
-        { name: 'urumi-gateway', version: deps.version },
+        { name: 'ahjin-gateway', version: deps.version },
         { capabilities: { tools: { listChanged: true } }, instructions: INSTRUCTIONS },
       );
       // Upstream definitions and results were already validated by the SDK client that fetched them.

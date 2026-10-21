@@ -1,4 +1,4 @@
-import { CreateApiKeyRequestSchema } from '@urumi/contracts';
+import { CreateApiKeyRequestSchema } from '@ahjin/contracts';
 import type { FastifyInstance } from 'fastify';
 import * as z from 'zod';
 import type { GatewayContext } from '../../context';

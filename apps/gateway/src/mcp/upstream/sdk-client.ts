@@ -35,7 +35,7 @@ export class SdkUpstreamClient implements UpstreamClient {
 
   async connect(timeoutMs: number) {
     const client = new Client(
-      { name: 'urumi-gateway', version: '0.1.0' },
+      { name: 'ahjin-gateway', version: '0.1.0' },
       {
         versionNegotiation: { mode: 'auto' },
         listChanged: {

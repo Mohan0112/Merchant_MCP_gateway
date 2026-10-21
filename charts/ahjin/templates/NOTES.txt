@@ -4,12 +4,12 @@ Release {{ .Release.Name }} ({{ .Chart.Name }} {{ .Chart.Version }}) in namespac
 
 Public URLs (Ingress):
 {{- if .Values.store.enabled }}
-  Storefront    {{ $scheme }}://{{ include "urumi.host" (list . "store") }}/
-  Store admin   {{ $scheme }}://{{ include "urumi.host" (list . "store") }}/wp-admin/
+  Storefront    {{ $scheme }}://{{ include "ahjin.host" (list . "store") }}/
+  Store admin   {{ $scheme }}://{{ include "ahjin.host" (list . "store") }}/wp-admin/
 {{- end }}
 {{- if .Values.platform.enabled }}
-  Dashboard     {{ $scheme }}://{{ include "urumi.host" (list . "app") }}/
-  MCP endpoint  {{ $scheme }}://{{ include "urumi.host" (list . "app") }}/mcp  (bearer: an API key from the dashboard)
+  Dashboard     {{ $scheme }}://{{ include "ahjin.host" (list . "app") }}/
+  MCP endpoint  {{ $scheme }}://{{ include "ahjin.host" (list . "app") }}/mcp  (bearer: an API key from the dashboard)
 {{- end }}
 Internal only: MariaDB, PostgreSQL, woo-mcp, fx-mcp and the health endpoints.
 {{- if .Values.global.networkPolicy.enabled }}

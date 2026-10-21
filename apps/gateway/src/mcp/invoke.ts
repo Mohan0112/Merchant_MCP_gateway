@@ -1,4 +1,4 @@
-import type { AuditChannel, Role } from '@urumi/contracts';
+import type { AuditChannel, Role } from '@ahjin/contracts';
 import { ProtocolError, ProtocolErrorCode } from '@modelcontextprotocol/server';
 import { eq } from 'drizzle-orm';
 import type { GatewayContext } from '../context';

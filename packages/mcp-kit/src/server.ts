@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { hostHeaderValidation } from '@modelcontextprotocol/fastify';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
-import { createLogger, type Logger } from '@urumi/logger';
+import { createLogger, type Logger } from '@ahjin/logger';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import * as z from 'zod';
 import { isAuthorized, type StaticCredential } from './credential';

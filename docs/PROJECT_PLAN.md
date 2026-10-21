@@ -1,14 +1,14 @@
-# URUMI MCP Gateway: End-to-End Engineering Plan
+# Ahjin MCP Gateway: End-to-End Engineering Plan
 
-> WooCommerce hosting with a Team MCP Gateway on Kubernetes (Urumi AI FDE Internship, Round 1)
+> WooCommerce hosting with a Team MCP Gateway on Kubernetes (AI FDE Internship take-home, Round 1)
 
 | | |
 |---|---|
 | **Document** | Engineering plan and technical design |
 | **Version** | 1.3 (right-sized after external review; VPS deferred; updated with Task 3 spike findings) |
 | **Date** | 2026-10-15 |
-| **Source brief** | Urumi AI FDE Internship, Round 1: MCP Gateway on Kubernetes (kept outside this repository) |
-| **Code location** | `URUMI.ai/Project/` (git repository root), pushed to [github.com/Mohan0112/Merchant_MCP_gateway](https://github.com/Mohan0112/Merchant_MCP_gateway) |
+| **Source brief** | AI FDE Internship, Round 1: MCP Gateway on Kubernetes (kept outside this repository) |
+| **Code location** | `Project/` (git repository root), pushed to [github.com/Mohan0112/Merchant_MCP_gateway](https://github.com/Mohan0112/Merchant_MCP_gateway) |
 | **Status** | Approved. Core scope first; extras planned as Phase 2. |
 
 **Decisions confirmed with the project owner**
@@ -20,7 +20,7 @@
 | Production target | **VPS deferred** (v1.2). Core ships production values, a VPS runbook and a production rehearsal on a local cluster (Task 19); the live VPS deployment is Phase 2 Task 31 |
 | Extras | All stand-out items and the multi-store bonus, planned as **Phase 2**, started only after the core passes its Definition-of-Done check |
 | Defaults (§20.2) | Accepted: GitHub remote MCP as third server, INR and Asia/Kolkata, invite links without email, public repo |
-| Working directory | `URUMI.ai/Project/`. User-provided keys go in `Project/.env.local` (git-ignored); `Project/.env.example` is the committed empty template |
+| Working directory | `Project/`. User-provided keys go in `Project/.env.local` (git-ignored); `Project/.env.example` is the committed empty template |
 
 ### What changed in v1.1 and v1.2
 
@@ -31,7 +31,7 @@ An external review argued that v1.0 was sized like a multi-month enterprise plat
 | Code structure | Strict four-layer hexagonal architecture enforced by dependency-cruiser, domain event bus | Feature modules (`auth`, `keys`, `servers`, `audit`, `chat`, `mcp`, `db`); interfaces only at the three seams that need substitution (upstream MCP client, LLM provider, WooCommerce client); Node `EventEmitter` | Less code, same testability where it matters, easier to explain |
 | Chat agent | Separate `chat-agent` Deployment with JWT delegation and cross-pod SSE relay | `chat` module inside the gateway that still calls the gateway's own `/mcp` over loopback HTTP, authenticated with a short-lived in-memory token | Same auth, routing and audit path with one less service. Trade-off: the LLM key shares a pod with upstream credentials |
 | WooCommerce auth | OAuth 1.0a signing over in-cluster HTTP | HTTP Basic Auth with the REST key, enabled by a small mu-plugin that marks requests addressed to the internal service hostname as HTTPS | Standard WooCommerce auth with no signing edge cases |
-| Helm | Five charts, five releases, three namespaces, cross-namespace secret copies | One umbrella chart `charts/urumi` (sub-charts `store`, `mcp-server` ×2, `platform`), one release, one namespace `urumi` | No secret duplication or install ordering; sub-charts are still reusable for the multi-store bonus |
+| Helm | Five charts, five releases, three namespaces, cross-namespace secret copies | One umbrella chart `charts/ahjin` (sub-charts `store`, `mcp-server` ×2, `platform`), one release, one namespace `ahjin` | No secret duplication or install ordering; sub-charts are still reusable for the multi-store bonus |
 | Resilience | cockatiel timeouts, circuit breaker, bulkhead | `AbortSignal.timeout` plus a small consecutive-failure counter that marks a server Unreachable | Same behaviour, about 30 lines anyone can read |
 | Passwords and tokens | argon2 (native package), jose JWTs | `node:crypto` scrypt; random opaque tokens | Zero native dependencies |
 | Tooling | Lefthook, commitlint, Renovate, Testcontainers, MSW, Playwright, chart-testing, Trivy | `tsc`, ESLint, Vitest, `helm lint` + `helm template` (both values files) + kubeconform, gitleaks, an automated Definition-of-Done script; Trivy moves to Phase 2 | Keeps only checks that prove brief requirements or catch regressions |
@@ -123,7 +123,7 @@ Security hardening, tool permissions, observability, horizontal scaling and rate
 | A3 | A GitHub account is available for the repo, GHCR images and a fine-grained PAT for the external upstream | Use DeepWiki's public MCP server (no credential) as the third upstream |
 | A4 | Store currency is INR and timezone is Asia/Kolkata (configurable through values) | Change two values; "orders today" logic already uses the store timezone |
 | A5 | Free LLM tier rate limits are enough for the demo | Switch provider through values; tests use a scripted fake LLM |
-| A6 | The repository lives at `URUMI.ai/Project/`, inside the OneDrive-synced Desktop (owner's choice) | If installs slow down or files lock, pause OneDrive sync during heavy installs and builds (risk R3) |
+| A6 | The repository lives at `Project/`, inside the OneDrive-synced Desktop (owner's choice) | If installs slow down or files lock, pause OneDrive sync during heavy installs and builds (risk R3) |
 
 ### 2.5 Constraints from the brief
 
@@ -157,7 +157,7 @@ flowchart LR
     shopper(["Shopper"])
     client(["MCP client<br/>Claude Code / Cursor / Inspector"])
 
-    subgraph platform["URUMI platform"]
+    subgraph platform["Ahjin platform"]
         UC1("Manage MCP servers<br/>add, edit, disable, remove")
         UC2("View server status and tools")
         UC3("Invite members, manage roles")
@@ -410,7 +410,7 @@ Version numbers are pinned in Task 1 to the latest stable release at that point.
 |---|---|---|
 | Local Kubernetes | **k3d** (k3s in Docker) | Same distribution as the VPS: bundled Traefik, local-path storage, built-in NetworkPolicy enforcement |
 | Production Kubernetes | **k3s** single node on a VPS (Task 31: Oracle Always Free, Hetzner or student credits). Until then, a production rehearsal on k3d (Task 19) | Same distribution and chart |
-| Packaging | **Helm** (chart API v2, works with Helm 3.x and 4.x): one umbrella chart `charts/urumi` with local sub-charts | Mandated; one release and one pair of values files keeps local and prod differences in one place |
+| Packaging | **Helm** (chart API v2, works with Helm 3.x and 4.x): one umbrella chart `charts/ahjin` with local sub-charts | Mandated; one release and one pair of values files keeps local and prod differences in one place |
 | Ingress | **Traefik** (bundled with k3s) using standard `Ingress` objects | Nothing to install; the ingress-nginx project is retired |
 | TLS (production) | **cert-manager + Let's Encrypt** (HTTP-01) | Automated certificates |
 | DNS | Local: `*.127.0.0.1.nip.io`. Production: **DuckDNS** subdomain with wildcard | No hosts-file edits; free |
@@ -494,7 +494,7 @@ flowchart LR
     shopper(["Shopper"])
     mcpc(["MCP client<br/>Claude Code / Cursor / Inspector"])
 
-    subgraph urumi["URUMI platform on Kubernetes"]
+    subgraph ahjin["Ahjin platform on Kubernetes"]
         dash["Dashboard"]
         gw["Team MCP Gateway<br/>with built-in chat agent"]
         store["WooCommerce store"]
@@ -586,7 +586,7 @@ Each ADR becomes a short file in `docs/adr/` (context, decision, consequences, a
 | ADR-003 | Tool names are `slug__tool` | Deterministic, collision-free, no shadowing, readable for LLMs | Longer names; slugs become immutable |
 | ADR-004 | `tools/list` served from an event-refreshed catalog snapshot | Slow or dead upstreams can't stall listing | Catalog can be seconds stale; mitigated by `list_changed` events |
 | ADR-005 | The chat agent is a module inside the gateway that calls the gateway's own `/mcp` over loopback HTTP with a short-lived in-memory token | Same auth, routing and audit path as external clients, without an extra service or JWTs | The LLM key shares a pod with upstream credentials; chat load shares gateway resources. Extracting the module into its own service is a Phase 2 option. |
-| ADR-006 | One umbrella Helm chart (`charts/urumi`) with sub-charts, installed as one release in one namespace (`urumi`) | One values pair, no cross-namespace secret copies, no install ordering | Components can't be rolled back independently |
+| ADR-006 | One umbrella Helm chart (`charts/ahjin`) with sub-charts, installed as one release in one namespace (`ahjin`) | One values pair, no cross-namespace secret copies, no install ordering | Components can't be rolled back independently |
 | ADR-007 | Traefik with standard `Ingress` objects | Bundled with k3s in both environments; ingress-nginx is retired | Traefik-specific timeouts set through `HelmChartConfig` |
 | ADR-008 | Secrets are created outside the chart from one git-ignored `.env.local` by `scripts/secrets.mjs`; the chart only references `existingSecret` names | Same chart behaviour everywhere; no secrets in values | One script to maintain (SOPS in Phase 2) |
 | ADR-009 | PostgreSQL for platform state | Integrity, JSONB, indexing, multi-replica ready | One more stateful workload |
@@ -599,7 +599,7 @@ Each ADR becomes a short file in `docs/adr/` (context, decision, consequences, a
 ### 7.5 Repository structure
 
 ```text
-URUMI.ai/Project/               (git repository root)
+Project/               (git repository root)
 ├── apps/
 │   ├── dashboard/              React + Vite SPA (src/features/*)
 │   ├── gateway/                Fastify: REST BFF + aggregating MCP endpoint + chat module
@@ -616,7 +616,7 @@ URUMI.ai/Project/               (git repository root)
 │   ├── mcp-kit/                Shared MCP server bootstrap (transport, auth, health, server_info, ToolHandler)
 │   └── logger/                 pino setup with redaction
 ├── charts/
-│   └── urumi/                  Umbrella chart (one release, namespace urumi)
+│   └── ahjin/                  Umbrella chart (one release, namespace ahjin)
 │       ├── Chart.yaml          depends on the local sub-charts below
 │       ├── values.yaml, values-local.yaml, values-prod.yaml, values.schema.json
 │       ├── templates/          shared NetworkPolicies, Traefik HelmChartConfig, ClusterIssuer (prod)
@@ -901,7 +901,7 @@ Every tool returns `structuredContent` with an `outputSchema`, plus a JSON text 
 - The bootstrap Job creates a WordPress user `mcp-bot` with the **`shop_manager` role**, not administrator: it can manage products and orders but not plugins, users or settings.
 - It inserts a REST API key for that user. The consumer key and secret come from a Kubernetes Secret, and the key is stored with WooCommerce's own hash function, so the Job needs no Kubernetes API access.
 - `woo-mcp` calls the internal Service `http://wordpress:8080/wp-json/wc/v3/...` with **HTTP Basic Auth** (consumer key and secret).
-- WooCommerce only accepts Basic Auth when WordPress believes the request is HTTPS. A tiny must-use plugin baked into our image (`mu-plugins/urumi-internal-https.php`) sets `$_SERVER['HTTPS'] = 'on'` **only when the `Host` header equals the internal Service name** (from env `URUMI_INTERNAL_HOST`).
+- WooCommerce only accepts Basic Auth when WordPress believes the request is HTTPS. A tiny must-use plugin baked into our image (`mu-plugins/ahjin-internal-https.php`) sets `$_SERVER['HTTPS'] = 'on'` **only when the `Host` header equals the internal Service name** (from env `AHJIN_INTERNAL_HOST`).
 - That's safe because Traefik only routes `store.DOMAIN` to WordPress, so an outside request can't arrive with the internal host name. NetworkPolicy also allows only Traefik and `woo-mcp` to reach WordPress.
 - The Task 3 spike confirms this end to end. The documented fallback is OAuth 1.0a signing against the site's home URL.
 - Traffic between `woo-mcp` and WordPress never leaves the cluster. mTLS is a noted production gap.
@@ -1069,7 +1069,7 @@ classDiagram
 | Caller | Credential | Storage | Lifetime |
 |---|---|---|---|
 | Dashboard user | Email + password → opaque session cookie (`httpOnly`, `SameSite=Lax`, `Secure` in prod) | Password: scrypt with per-user salt. Session token: SHA-256 hash in `sessions` | 12 h idle, 7 days absolute |
-| MCP client | API key `umcp_<prefix8>_<secret43>` in `Authorization: Bearer` | Prefix in clear (lookup and display), HMAC-SHA256(key, pepper) for verification | Until revoked or optional expiry |
+| MCP client | API key `amcp_<prefix8>_<secret43>` in `Authorization: Bearer` | Prefix in clear (lookup and display), HMAC-SHA256(key, pepper) for verification | Until revoked or optional expiry |
 | Chat module | Chat token (§8.4.1) | In memory only | 5 minutes, tied to a live dashboard session |
 | Gateway → upstreams | Static bearer or header credential | AES-256-GCM in `upstream_servers` | Rotated by an admin edit |
 
@@ -1094,7 +1094,7 @@ The UI hides what a role can't do, but **every rule is enforced on the server** 
 
 #### 8.5.3 API key design and lifecycle
 
-- **Generation:** 32 random bytes, base64url. Format `umcp_` + 8-character prefix + `_` + secret. The `umcp_` marker lets secret scanners such as gitleaks and GitHub push protection recognise leaked keys.
+- **Generation:** 32 random bytes, base64url. Format `amcp_` + 8-character prefix + `_` + secret. The `amcp_` marker lets secret scanners such as gitleaks and GitHub push protection recognise leaked keys.
 - **Verification:** parse prefix → indexed lookup → constant-time HMAC comparison (`crypto.timingSafeEqual`) → check `revoked_at`, `expires_at` and that the user is active. No cache, so revocation takes effect on the next request. `last_used_at` is written at most once per minute per key.
 - **Limits:** 10 active keys per user. The plaintext key is returned once in the create response and never again.
 
@@ -1280,7 +1280,7 @@ sequenceDiagram
     participant D as MariaDB
     participant L as Audit log
 
-    B->>T: POST /mcp tools/call woo__list_orders period=today<br/>Authorization Bearer umcp_...
+    B->>T: POST /mcp tools/call woo__list_orders period=today<br/>Authorization Bearer amcp_...
     T->>G: forward (TLS ends here in prod)
     G->>A: verify key (prefix lookup, HMAC compare)
     A-->>G: Principal userB, member, keyId
@@ -1466,7 +1466,7 @@ flowchart TD
 
 ```text
 ┌────────────┬──────────────────────────────────────────────────────────────────────┐
-│ URUMI      │  MCP servers                                        [+ Add server]   │
+│ Ahjin      │  MCP servers                                        [+ Add server]   │
 │            │  ● 2 Connected   ● 1 Unreachable   ○ 0 Disabled                      │
 │ Servers    │ ┌──────────────────┬───────────────┬────────┬────────────┬─────────┐ │
 │ Chat       │ │ Server           │ Status        │ Tools  │ Checked    │ Enabled │ │
@@ -1483,17 +1483,17 @@ flowchart TD
 
 ```text
 ┌ Chat ──────────────────────────────────────────────────────────────── [New chat] ┐
-│ You: Create a product "Urumi Mug" priced 499                                     │
+│ You: Create a product "Ahjin Mug" priced 499                                     │
 │ ┌ Tools used ─────────────────────────────────────────────────────────────────┐  │
 │ │ ✓ woo__create_product   WooCommerce   412 ms        [arguments] [result]    │  │
 │ └─────────────────────────────────────────────────────────────────────────────┘  │
-│ Assistant: Created "Urumi Mug" (ID 128) at ₹499. View it on the storefront ↗     │
+│ Assistant: Created "Ahjin Mug" (ID 128) at ₹499. View it on the storefront ↗     │
 │                                                                                  │
 │ You: What orders came in today?                                                  │
 │ ┌ Tools used ─────────────────────────────────────────────────────────────────┐  │
 │ │ ✓ woo__list_orders      WooCommerce   188 ms        [arguments] [result]    │  │
 │ └─────────────────────────────────────────────────────────────────────────────┘  │
-│ Assistant: 1 order today: #131, Urumi Mug × 1, ₹499, processing.                 │
+│ Assistant: 1 order today: #131, Ahjin Mug × 1, ₹499, processing.                 │
 │ ┌──────────────────────────────────────────────────────────────────────┐ [Send]  │
 │ │ Ask about products, orders, currencies…                              │         │
 │ └──────────────────────────────────────────────────────────────────────┘         │
@@ -1506,14 +1506,14 @@ flowchart TD
 ┌ API key created ─────────────────────────────────────────────────────────┐
 │ Copy it now. You won't be able to see it again.                          │
 │ ┌──────────────────────────────────────────────────────────┐ [Copy]      │
-│ │ umcp_8f3k2j1a_Xy7Q…                                      │             │
+│ │ amcp_8f3k2j1a_Xy7Q…                                      │             │
 │ └──────────────────────────────────────────────────────────┘             │
 │ Claude Code                                                              │
-│   claude mcp add --transport http urumi https://app.DOMAIN/mcp \         │
-│     --header "Authorization: Bearer umcp_8f3k2j1a_…"          [Copy]     │
+│   claude mcp add --transport http ahjin https://app.DOMAIN/mcp \         │
+│     --header "Authorization: Bearer amcp_8f3k2j1a_…"          [Copy]     │
 │ Cursor (~/.cursor/mcp.json)                                              │
-│   { "mcpServers": { "urumi": { "url": "https://app.DOMAIN/mcp",          │
-│       "headers": { "Authorization": "Bearer umcp_…" } } } }   [Copy]     │
+│   { "mcpServers": { "ahjin": { "url": "https://app.DOMAIN/mcp",          │
+│       "headers": { "Authorization": "Bearer amcp_…" } } } }   [Copy]     │
 │                                                              [Done]      │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1556,7 +1556,7 @@ flowchart TD
 
 ### 10.1 Topology
 
-Everything runs in **one namespace, `urumi`**, installed as **one Helm release** (also named `urumi`). Isolation between components comes from NetworkPolicies on pod labels (§10.8) and from authentication.
+Everything runs in **one namespace, `ahjin`**, installed as **one Helm release** (also named `ahjin`). Isolation between components comes from NetworkPolicies on pod labels (§10.8) and from authentication.
 
 | Workload | Kind | Replicas | Exposure | Storage |
 |---|---|---|---|---|
@@ -1580,7 +1580,7 @@ flowchart TB
         subgraph ks["namespace kube-system"]
             traefik["Traefik ingress<br/>ports 80 and 443"]
         end
-        subgraph ns["namespace urumi (one Helm release)"]
+        subgraph ns["namespace ahjin (one Helm release)"]
             subgraph storeGrp["store sub-chart"]
                 wp["Deployment wordpress<br/>Apache + PHP on 8080"]
                 cron["CronJob wp-cron"]
@@ -1627,8 +1627,8 @@ flowchart TB
 
 | Item | Detail |
 |---|---|
-| Chart | `charts/urumi` (umbrella) with local sub-charts `store`, `mcp-server` (aliased as `woo-mcp` and `fx-mcp`) and `platform` |
-| Release | `helm upgrade --install urumi charts/urumi -n urumi --create-namespace -f charts/urumi/values-local.yaml` |
+| Chart | `charts/ahjin` (umbrella) with local sub-charts `store`, `mcp-server` (aliased as `woo-mcp` and `fx-mcp`) and `platform` |
+| Release | `helm upgrade --install ahjin charts/ahjin -n ahjin --create-namespace -f charts/ahjin/values-local.yaml` |
 | Values | `values.yaml` (safe defaults), `values-local.yaml`, `values-prod.yaml`, plus `values.schema.json` that rejects typos and missing required values |
 | Cluster-level bits | Traefik `HelmChartConfig` (streaming timeouts, in `kube-system`) and the cert-manager `ClusterIssuer` (prod only) are templates in the umbrella chart, switched on by values |
 | `mcp-server` sub-chart | Deployment, ClusterIP Service, ConfigMap, NetworkPolicy. **It has no Ingress template**, so an MCP server can't be exposed by mistake. The multi-store bonus and hosted servers reuse it. |
@@ -1645,7 +1645,7 @@ Prerequisites installed separately in production only: cert-manager (its officia
 | Domain | `127.0.0.1.nip.io` → `store.127.0.0.1.nip.io`, `app.127.0.0.1.nip.io` | `<name>.duckdns.org` → `store.<name>.duckdns.org`, `app.<name>.duckdns.org` |
 | TLS | Off (HTTP) | cert-manager annotation, `letsencrypt-prod` ClusterIssuer, TLS secret per host |
 | Ingress class | `traefik` | `traefik` |
-| Images | `k3d-urumi-registry.localhost:5001/...`, tag `dev`, `pullPolicy: Always` | `ghcr.io/mohan0112/merchant_mcp_gateway/<app>` (GHCR names must be lowercase), immutable git-SHA tag, `IfNotPresent` |
+| Images | `k3d-ahjin-registry.localhost:5001/...`, tag `dev`, `pullPolicy: Always` | `ghcr.io/mohan0112/merchant_mcp_gateway/<app>` (GHCR names must be lowercase), immutable git-SHA tag, `IfNotPresent` |
 | Storage class and sizes | `local-path`; MariaDB 2 Gi, uploads 1 Gi, Postgres 1 Gi | `local-path` (or OCI block volume CSI); MariaDB 10 Gi, uploads 5 Gi, Postgres 5 Gi |
 | Resources | Lean profile (§10.7) | Same requests, higher limits |
 | Secrets | `scripts/secrets.mjs` against the k3d context | Same script against the VPS context |
@@ -1659,7 +1659,7 @@ CI renders the chart with both values files and validates the output with kubeco
 
 ### 10.4 Secrets strategy
 
-All secrets live in namespace `urumi`, so nothing is copied between namespaces.
+All secrets live in namespace `ahjin`, so nothing is copied between namespaces.
 
 | Secret | Keys | Used by | Source |
 |---|---|---|---|
@@ -1682,7 +1682,7 @@ All secrets live in namespace `urumi`, so nothing is copied between namespaces.
 ### 10.5 Networking, ingress and domains
 
 **Local domain approach.** We use `*.127.0.0.1.nip.io`, a public wildcard DNS name that resolves to `127.0.0.1`. k3d maps host ports 80 and 443 to Traefik, so `http://store.127.0.0.1.nip.io` and `http://app.127.0.0.1.nip.io` work in browsers, curl, Claude Code and Cursor without editing the hosts file.
-- *Offline fallback:* add `127.0.0.1 store.urumi.test app.urumi.test` to `C:\Windows\System32\drivers\etc\hosts` and set `global.domain=urumi.test`.
+- *Offline fallback:* add `127.0.0.1 store.ahjin.test app.ahjin.test` to `C:\Windows\System32\drivers\etc\hosts` and set `global.domain=ahjin.test`.
 - *Port conflict fallback:* if port 80 is taken on Windows, map 8080 instead and include the port in the URLs.
 - `wp-cron` runs as a CronJob, so WordPress doesn't depend on loopback HTTP requests to its public URL.
 
@@ -1722,7 +1722,7 @@ Total memory limits are about 2.4 GiB, within NFR-RES-01. Node processes set `--
 
 ### 10.8 NetworkPolicies (core)
 
-All policies live in namespace `urumi` and select pods by `app.kubernetes.io/name`.
+All policies live in namespace `ahjin` and select pods by `app.kubernetes.io/name`.
 
 | Policy for | Allows ingress from |
 |---|---|
@@ -1747,7 +1747,7 @@ sequenceDiagram
     participant WP as WordPress
     participant J as store-bootstrap Job
 
-    Dev->>H: helm upgrade --install urumi -f values-local.yaml --wait
+    Dev->>H: helm upgrade --install ahjin -f values-local.yaml --wait
     H->>K: apply Services, StatefulSets, Deployments, PVCs, Ingress, NetworkPolicies
     K->>DB: schedule, bind PVC, start
     K->>WP: schedule, bind PVC, start
@@ -1772,7 +1772,7 @@ Every step checks before it acts (for example, `wp core is-installed || wp core 
 flowchart LR
     a["task cluster:up<br/>k3d cluster + registry"] --> b["task secrets<br/>.env.local to Secrets"]
     b --> c["task images:build<br/>build and push to k3d registry"]
-    c --> d["task deploy:local<br/>helm upgrade --install urumi"]
+    c --> d["task deploy:local<br/>helm upgrade --install ahjin"]
     d --> e["task dod<br/>Definition-of-Done check"]
     e --> f["Open store and app URLs<br/>log in as bootstrap admin"]
 ```
@@ -1803,13 +1803,13 @@ flowchart TD
     E -->|yes| F["Done, note the revision"]
     E -->|"no"| G["Helm rolls back to the previous revision automatically"]
     F --> H{"Problem found later?"}
-    H -->|yes| I["helm rollback urumi REVISION --wait"]
+    H -->|yes| I["helm rollback ahjin REVISION --wait"]
     I --> J{"Did the release change the DB schema?"}
     J -->|"no, or expand-only"| K["Done"]
     J -->|"destructive change"| L["Restore backup using the runbook"]
 ```
 
-- **One release:** `helm history urumi` shows every revision. A rollback restores the whole platform to a known-good combination of image tags and config; unchanged components are untouched by the rollback.
+- **One release:** `helm history ahjin` shows every revision. A rollback restores the whole platform to a known-good combination of image tags and config; unchanged components are untouched by the rollback.
 - **Helm 4 flags:** `--rollback-on-failure` replaces Helm 3's `--atomic`.
 - **Migrations use expand/contract:** a release only adds columns and tables; removals ship one release later. The previous gateway version always works with the current schema, so `helm rollback` is safe.
 - **WooCommerce upgrades:** bump the image (new WooCommerce version); the bootstrap hook runs `wp wc update`. WooCommerce DB migrations aren't reversible by Helm, so the pre-upgrade backup is the rollback path.
@@ -2101,7 +2101,7 @@ flowchart LR
 #### Task 1: Repository and engineering baseline
 **Lane:** Foundation · **Size:** S · **Depends on:** none · **Parallel with:** Task 2
 
-Goal: a monorepo in `URUMI.ai/Project/` where every later task can add code with linting, types, tests and CI already in place.
+Goal: a monorepo in `Project/` where every later task can add code with linting, types, tests and CI already in place.
 - [ ] `git init`; `.gitignore` (already created, ignores `.env.local`); `.gitattributes` with LF line endings (needed for shell scripts in images built on Windows).
 - [ ] pnpm workspaces + Turborepo; Node 24 pinned via `packageManager` and `engines`.
 - [ ] Shared strict `tsconfig`, ESLint (typescript-eslint, `import/no-cycle`), Prettier, Vitest.
@@ -2111,16 +2111,16 @@ Goal: a monorepo in `URUMI.ai/Project/` where every later task can add code with
 - [ ] Copy this plan into `Project/docs/PROJECT_PLAN.md` so it's versioned with the code.
 - [ ] **Owner:** `gh auth login`. The public repo `Mohan0112/Merchant_MCP_gateway` already exists (empty); the first push happens after one confirmation.
 
-**Acceptance:** `pnpm install && pnpm turbo lint typecheck test build` passes locally and in CI. A test commit containing a fake `umcp_` key is flagged by gitleaks in CI.
+**Acceptance:** `pnpm install && pnpm turbo lint typecheck test build` passes locally and in CI. A test commit containing a fake `amcp_` key is flagged by gitleaks in CI.
 
 #### Task 2: Local Kubernetes platform
 **Lane:** Platform · **Size:** M · **Depends on:** none · **Parallel with:** Task 1
 
 Goal: a reproducible local cluster that matches production.
-- [ ] `deploy/k3d/cluster.yaml`: 1 server + 1 agent, pinned k3s version, ports 80/443 to the load balancer, local registry `urumi-registry` on port 5001.
+- [ ] `deploy/k3d/cluster.yaml`: 1 server + 1 agent, pinned k3s version, ports 80/443 to the load balancer, local registry `ahjin-registry` on port 5001.
 - [ ] Confirm Traefik and `local-path` work. Prove NetworkPolicy enforcement with two test pods.
 - [ ] Document the local domain approach (`*.127.0.0.1.nip.io`, with hosts-file fallback) in `docs/local-domains.md`.
-- [ ] Umbrella chart skeleton `charts/urumi` with the Traefik `HelmChartConfig` for streaming timeouts.
+- [ ] Umbrella chart skeleton `charts/ahjin` with the Traefik `HelmChartConfig` for streaming timeouts.
 - [ ] Taskfile targets: `cluster:up`, `cluster:down`, `cluster:reset`, `images:build`, `deploy:local`.
 
 **Acceptance:** `task cluster:up` builds a cluster from nothing. A hello-world release answers at `http://hello.127.0.0.1.nip.io`. A deny policy blocks traffic between the test pods.
@@ -2140,7 +2140,7 @@ Goal: prove the riskiest integrations with throwaway code in `spikes/`, deleted 
 **Lane:** Platform · **Size:** L · **Depends on:** Task 2 · **Parallel with:** Tasks 3, 9
 
 Goal: WordPress and MariaDB running on Kubernetes with persistence, probes and limits.
-- [ ] `docker/wordpress/Dockerfile`: pinned `wordpress:7.1.3-php8.4-apache` base, WP-CLI, pinned WooCommerce and Storefront baked in, `healthz.php`, the `urumi-internal-https.php` mu-plugin. `wp-config` extras: reverse-proxy HTTPS detection, `DISABLE_WP_CRON`, `DISALLOW_FILE_MODS`.
+- [ ] `docker/wordpress/Dockerfile`: pinned `wordpress:7.1.3-php8.4-apache` base, WP-CLI, pinned WooCommerce and Storefront baked in, `healthz.php`, the `ahjin-internal-https.php` mu-plugin. `wp-config` extras: reverse-proxy HTTPS detection, `DISABLE_WP_CRON`, `DISALLOW_FILE_MODS`.
 - [ ] `store` sub-chart: MariaDB 11.4 StatefulSet with headless Service, `volumeClaimTemplates` and `healthcheck.sh` probes.
 - [ ] WordPress Deployment (`Recreate`), uploads PVC, Service, Ingress `store.DOMAIN`.
 - [ ] `existingSecret` references for DB credentials, salts and the admin account.
@@ -2227,7 +2227,7 @@ Goal: users, roles, sessions, invitations and API keys (§8.5).
 - [ ] `auth` module: login and logout with hashed opaque sessions in `httpOnly` cookies; in-memory login rate limit; CSRF header check; `requireRole('admin')` guard.
 - [ ] Bootstrap admin from `gateway-bootstrap-admin` on an empty DB, with forced password change.
 - [ ] Invitations: one-time link, 72 h, hashed token; accept flow.
-- [ ] `keys` module: `umcp_` format; issue with plaintext shown once; list, revoke, verify; throttled `last_used_at`; per-user cap; admin issue-for-member.
+- [ ] `keys` module: `amcp_` format; issue with plaintext shown once; list, revoke, verify; throttled `last_used_at`; per-user cap; admin issue-for-member.
 - [ ] Last-admin protection; deactivation revokes keys and sessions.
 - [ ] Unit tests plus integration tests against Postgres, including negative tests (member calling admin routes).
 
@@ -2321,7 +2321,7 @@ Goal: the tool loop running inside the gateway as the logged-in user (§8.4).
 
 **Acceptance:**
 - With the scripted fake LLM, a test shows the tool call passing through `/mcp` and an audit row with `channel=chat_agent` and the logged-in user's ID.
-- With Groq, "create a product called Urumi Mug for 499" creates it on the storefront.
+- With Groq, "create a product called Ahjin Mug for 499" creates it on the storefront.
 
 #### Task 16: Chat UI
 **Lane:** Frontend · **Size:** M · **Depends on:** Tasks 13, 15
@@ -2368,7 +2368,7 @@ Goal: prove the production values work and document the VPS path, without needin
   - Reset the local cluster and install cert-manager.
   - Install the chart with `values-prod.yaml` + `values-rehearsal.yaml`, pulling the CI-built images from GHCR.
   - Run `task dod` against the HTTPS URLs.
-- [ ] Rehearse an upgrade and a `helm rollback urumi` on that cluster.
+- [ ] Rehearse an upgrade and a `helm rollback ahjin` on that cluster.
 - [ ] Write `docs/runbooks/vps.md` from §10.11: the exact VPS steps for k3s, DNS, cert-manager and Secrets. This also feeds the README's "VPS setup" section required by the brief.
 
 **Acceptance:**
@@ -2432,14 +2432,14 @@ flowchart LR
 #### Task 22: Security hardening
 **Size:** M · **Depends on:** core
 - [ ] **SSRF guard** for upstream URLs: scheme allow-list; resolve DNS and block loopback, private, link-local, CGNAT, IPv6 ULA and cloud metadata (`169.254.169.254`); pin the resolved IP in the undici dispatcher to defeat DNS rebinding; explicit allow-list for platform-managed `*.svc.cluster.local` servers.
-- [ ] **Default-deny** ingress and egress NetworkPolicies in namespace `urumi`, with DNS exceptions. Gateway egress only to the `woo-mcp` and `fx-mcp` pods, Postgres and public 443 (private ranges excluded with `ipBlock.except`).
+- [ ] **Default-deny** ingress and egress NetworkPolicies in namespace `ahjin`, with DNS exceptions. Gateway egress only to the `woo-mcp` and `fx-mcp` pods, Postgres and public 443 (private ranges excluded with `ipBlock.except`).
 - [ ] Pod Security Admission `restricted` label on the namespace; WordPress running as non-root on 8080.
 - [ ] Encryption-key versioning (`credential_key_version` column) with a re-encryption Job for rotation.
 - [ ] DB-level append-only audit: separate migrator and app roles; the app role has no `UPDATE` or `DELETE` on `audit_logs`.
 - [ ] Trivy image scanning in CI (fail on critical).
 - [ ] **Tool-definition pinning:** hash each tool's name, description and schemas; a changed definition is hidden and flagged until an admin approves it. Description length caps.
 
-**Acceptance:** registering `http://169.254.169.254/` or `http://postgres.urumi.svc:5432` is rejected with a clear reason; `kubectl exec` curl probes confirm default-deny; a modified upstream tool disappears until approved.
+**Acceptance:** registering `http://169.254.169.254/` or `http://postgres.ahjin.svc:5432` is rejected with a clear reason; `kubectl exec` curl probes confirm default-deny; a modified upstream tool disappears until approved.
 
 #### Task 23: Tool permissions
 **Size:** M · **Depends on:** Task 22 (soft)
@@ -2494,12 +2494,12 @@ flowchart LR
 - [ ] Recorded drills: upgrade then roll back the release; WooCommerce version bump with restore.
 - [ ] `helm diff` in the deploy task.
 
-**Acceptance:** a deliberately broken gateway image is rolled back automatically by `--rollback-on-failure`; a manual `helm rollback urumi` after a good upgrade keeps all data.
+**Acceptance:** a deliberately broken gateway image is rolled back automatically by `--rollback-on-failure`; a manual `helm rollback ahjin` after a good upgrade keeps all data.
 
 #### Task 29: Hosted MCP servers
 **Size:** L · **Depends on:** shared provisioner code from Task 30
 - [ ] Admin adds a server by container image (with env vars, secret values, port, resource preset).
-- [ ] The provisioner creates Deployment, Service, Secret, NetworkPolicy and limits in `urumi-mcp-hosted` through the Kubernetes API with a namespaced least-privilege Role, then registers the server automatically.
+- [ ] The provisioner creates Deployment, Service, Secret, NetworkPolicy and limits in `ahjin-mcp-hosted` through the Kubernetes API with a namespaced least-privilege Role, then registers the server automatically.
 - [ ] Image registry allow-list; removal deletes everything by label and unregisters the server.
 
 **Acceptance:** adding a public MCP server image makes its tools appear in Claude Code with no manual kubectl steps; removing it leaves no resources behind.
@@ -2539,7 +2539,7 @@ Goal: the same chart and production values running on a real VPS with real TLS.
 - [ ] Follow `docs/runbooks/vps.md` (§10.11): harden, open ports, install k3s, DuckDNS, cert-manager with Let's Encrypt (staging, then prod).
 - [ ] If the VPS is ARM, add arm64 builds to CI (GitHub's native arm64 runners) and publish multi-arch manifests.
 - [ ] `task secrets ENV=prod`, `task deploy:prod`, `task dod` against the public URLs; connect Claude Code to the HTTPS gateway.
-- [ ] Record an upgrade and a `helm rollback urumi` on the VPS.
+- [ ] Record an upgrade and a `helm rollback ahjin` on the VPS.
 
 **Acceptance:** storefront and dashboard served over trusted HTTPS at stable URLs. Claude Code works against `https://app.<domain>/mcp`. No chart changes compared with local.
 
@@ -2596,7 +2596,7 @@ The order follows the brief's "Demo video requirements". The system is reset wit
 | # | Segment | What to show |
 |---|---|---|
 | 1 | System design | §7.3 diagram; each component's responsibility; why four layers |
-| 2 | Kubernetes tour | `kubectl get pods,svc,ingress,pvc,secrets,networkpolicy -n urumi`; requests, limits and probes in a manifest; what's public versus internal (curl from a random pod to `woo-mcp` is blocked) |
+| 2 | Kubernetes tour | `kubectl get pods,svc,ingress,pvc,secrets,networkpolicy -n ahjin`; requests, limits and probes in a manifest; what's public versus internal (curl from a random pod to `woo-mcp` is blocked) |
 | 3 | Store DoD | Shopper adds to cart, pays cash on delivery; order visible in wp-admin |
 | 4 | User A chat | Create a product → storefront; place an order by hand → "what orders came in today?"; tool chips visible |
 | 5 | User B external client | Generate a key, `claude mcp add …` with only URL and key; tool list; the orders question; a cross-server prompt (woo + fx, then woo + fx + github) |
@@ -2604,7 +2604,7 @@ The order follows the brief's "Demo video requirements". The system is reset wit
 | 7 | MCP internals | §8.8.1 sequence; the `server_info` collision; slow-upstream timeout; dead upstream |
 | 8 | Security posture | Hashed keys and ciphertext in Postgres; member versus admin capabilities; what a malicious server could and couldn't do |
 | 9 | Chat agent internals | §8.4.2 loop; the chat module calling the gateway's own `/mcp` with a chat token; audit `channel=chat_agent` |
-| 10 | Local to VPS | `diff values-local.yaml values-prod.yaml`; ingress, domains, TLS, storage, secrets; the production rehearsal over HTTPS; live `helm upgrade` and `helm rollback urumi`; walk through the VPS runbook (or show the live VPS if Task 31 is done) |
+| 10 | Local to VPS | `diff values-local.yaml values-prod.yaml`; ingress, domains, TLS, storage, secrets; the production rehearsal over HTTPS; live `helm upgrade` and `helm rollback ahjin`; walk through the VPS runbook (or show the live VPS if Task 31 is done) |
 | 11 | Extras | Whatever Phase 2 items are done |
 
 ---
@@ -2614,7 +2614,7 @@ The order follows the brief's "Demo video requirements". The system is reset wit
 - [ ] GitHub repo (public), with a clean history of task commits
 - [ ] `README.md`: local setup; VPS setup; placing an order; connecting an external MCP client; using the chat agent
 - [ ] Source: `apps/dashboard`, `apps/gateway` (including the chat module), `apps/woo-mcp`, `apps/fx-mcp`, `packages/*`
-- [ ] Helm chart `charts/urumi` with `values-local.yaml` and `values-prod.yaml`
+- [ ] Helm chart `charts/ahjin` with `values-local.yaml` and `values-prod.yaml`
 - [ ] `docs/system-design.md` (architecture, aggregation, routing, failure handling, production changes)
 - [ ] `docs/threat-model.md` (the four required questions)
 - [ ] List of extras attempted and where to find them
@@ -2641,7 +2641,7 @@ The order follows the brief's "Demo video requirements". The system is reset wit
 | D-10 | `node:crypto` only (scrypt, HMAC, AES-GCM, random tokens); no native crypto packages | §6.1 |
 | D-11 | Lean tooling: `tsc`, ESLint, Vitest, Helm checks, gitleaks, DoD script | §13 |
 | D-12 | Defaults accepted: GitHub remote MCP as third server, INR and Asia/Kolkata, invite links without email, public repo | §20.2 |
-| D-13 | Code lives in `URUMI.ai/Project/`; user-provided values in `Project/.env.local` | §2.4 |
+| D-13 | Code lives in `Project/`; user-provided values in `Project/.env.local` | §2.4 |
 
 ### 20.2 Questions
 
@@ -2652,5 +2652,5 @@ The order follows the brief's "Demo video requirements". The system is reset wit
 | OQ-3 | How are invitations delivered? | **Accepted:** copyable link, no SMTP |
 | OQ-4 | Public repo and public GHCR images? | **Accepted:** public |
 | OQ-5 | Laptop memory? | **Confirmed:** 16 GB, 12 cores |
-| OQ-6 | Where does the code live? | **Decided:** `URUMI.ai/Project/` (inside OneDrive; see R3) |
+| OQ-6 | Where does the code live? | **Decided:** `Project/` (inside OneDrive; see R3) |
 | OQ-7 | Is there a deadline that limits Phase 2? | **Resolved:** no time constraint. All nine Phase 2 tasks are in scope after the core, in the §15 order |

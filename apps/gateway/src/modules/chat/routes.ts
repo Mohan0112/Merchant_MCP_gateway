@@ -1,4 +1,4 @@
-import { ChatRequestSchema, type ChatEvent } from '@urumi/contracts';
+import { ChatRequestSchema, type ChatEvent } from '@ahjin/contracts';
 import type { FastifyInstance } from 'fastify';
 import type { GatewayContext } from '../../context';
 import { parse } from '../../lib/http';

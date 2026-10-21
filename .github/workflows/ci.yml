@@ -48,12 +48,12 @@ jobs:
       - uses: azure/setup-helm@v5
       - name: Lint with local and production values
         run: |
-          helm lint charts/urumi -f charts/urumi/values-local.yaml
-          helm lint charts/urumi -f charts/urumi/values-prod.yaml
+          helm lint charts/ahjin -f charts/ahjin/values-local.yaml
+          helm lint charts/ahjin -f charts/ahjin/values-prod.yaml
       - name: Render both environments (proves only values differ)
         run: |
-          helm template urumi charts/urumi -n urumi -f charts/urumi/values-local.yaml > /dev/null
-          helm template urumi charts/urumi -n urumi -f charts/urumi/values-prod.yaml > /dev/null
+          helm template ahjin charts/ahjin -n ahjin -f charts/ahjin/values-local.yaml > /dev/null
+          helm template ahjin charts/ahjin -n ahjin -f charts/ahjin/values-prod.yaml > /dev/null
       # Probes, requests and limits, non-root, NetworkPolicies and kubeconform on both renders.
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7

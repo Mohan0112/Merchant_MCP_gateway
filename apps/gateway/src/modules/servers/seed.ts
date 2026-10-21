@@ -1,4 +1,4 @@
-import { UpstreamAuthTypeSchema } from '@urumi/contracts';
+import { UpstreamAuthTypeSchema } from '@ahjin/contracts';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import type { GatewayContext } from '../../context';

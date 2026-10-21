@@ -3,7 +3,7 @@
 {{- $root := index . 0 -}}
 app.kubernetes.io/name: {{ index . 1 }}
 app.kubernetes.io/component: store
-app.kubernetes.io/part-of: urumi
+app.kubernetes.io/part-of: ahjin
 app.kubernetes.io/instance: {{ $root.Release.Name }}
 app.kubernetes.io/managed-by: {{ $root.Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" $root.Chart.Name $root.Chart.Version | replace "+" "_" }}
@@ -85,7 +85,7 @@ seccompProfile:
   value: {{ .Values.wordpress.environmentType | quote }}
 - name: TRUST_FORWARDED_PROTO
   value: {{ .Values.wordpress.trustForwardedProto | quote }}
-- name: URUMI_INTERNAL_HOST
+- name: AHJIN_INTERNAL_HOST
   value: {{ .Values.wordpress.internalHost | quote }}
 - name: WORDPRESS_CONFIG_EXTRA
   value: |

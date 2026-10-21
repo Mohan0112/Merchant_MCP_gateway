@@ -1,4 +1,4 @@
-import { defineTool, ToolError, type ToolHandler } from '@urumi/mcp-kit';
+import { defineTool, ToolError, type ToolHandler } from '@ahjin/mcp-kit';
 import * as z from 'zod';
 import type { RatesSource, RateTable } from './rates';
 

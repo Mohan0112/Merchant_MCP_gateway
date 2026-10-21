@@ -18,6 +18,7 @@ import { api } from '../lib/api';
 import { duration, timeAgo } from '../lib/format';
 
 const REASONS: Record<string, string> = {
+  BLOCKED: 'Address not allowed',
   DNS: 'Host name not found',
   CONNECTION_REFUSED: 'Connection refused',
   TIMEOUT: 'Timed out',
@@ -106,6 +107,12 @@ export function ServersPage() {
             </dl>
             <div className="spread">
               <div className="row">
+                {server.pendingToolCount ? (
+                  <Badge tone="warning">
+                    {server.pendingToolCount} tool{server.pendingToolCount === 1 ? '' : 's'} to
+                    review
+                  </Badge>
+                ) : null}
                 {server.seeded ? <Badge tone="info">built-in</Badge> : null}
                 {server.hasCredential ? (
                   <Badge>{server.authType} credential</Badge>
@@ -144,23 +151,44 @@ export function ServersPage() {
   );
 }
 
-function ToolCard({ slug, tool }: { slug: string; tool: ToolInfo }) {
+function ToolCard({
+  slug,
+  tool,
+  onApprove,
+}: {
+  slug: string;
+  tool: ToolInfo;
+  /** Admins only, for tools awaiting review. */
+  onApprove?: () => void;
+}) {
   const hints = (tool.annotations ?? {}) as { readOnlyHint?: boolean; destructiveHint?: boolean };
   const properties = Object.keys(
     ((tool.inputSchema as { properties?: Record<string, unknown> } | null)?.properties ??
       {}) as object,
   );
   return (
-    <div className="tool">
+    <div className={`tool ${tool.review !== 'approved' ? 'pending' : ''}`}>
       <div className="spread">
         <code style={{ fontWeight: 600 }}>
           {slug}__{tool.name}
         </code>
         <div className="row">
+          {tool.review === 'changed' ? <Badge tone="warning">changed, hidden</Badge> : null}
+          {tool.review === 'new' ? <Badge tone="warning">new, hidden</Badge> : null}
           {hints.readOnlyHint ? <Badge tone="success">read-only</Badge> : null}
           {hints.destructiveHint ? <Badge tone="danger">destructive</Badge> : null}
+          {onApprove && tool.review !== 'approved' ? (
+            <button className="btn small" onClick={onApprove}>
+              Approve
+            </button>
+          ) : null}
         </div>
       </div>
+      {tool.approved ? (
+        <div className="small muted" style={{ marginTop: 4 }}>
+          Approved description: {tool.approved.description ?? '(none)'}
+        </div>
+      ) : null}
       {tool.description ? (
         <div className="small" style={{ marginTop: 4 }}>
           {tool.description}
@@ -186,6 +214,13 @@ function ServerDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const refresh = useMutation({
     mutationFn: () => api.refreshServer(id),
     onSettled: () => client.invalidateQueries({ queryKey: ['server', id] }),
+  });
+  const approve = useMutation({
+    mutationFn: (names?: string[]) => api.approveTools(id, names),
+    onSettled: async () => {
+      await client.invalidateQueries({ queryKey: ['server', id] });
+      await client.invalidateQueries({ queryKey: ['servers'] });
+    },
   });
   const remove = useMutation({
     mutationFn: () => api.deleteServer(id),
@@ -222,7 +257,7 @@ function ServerDetail({ id, onClose }: { id: string; onClose: () => void }) {
         ) : undefined
       }
     >
-      <ErrorNote error={detail.error ?? refresh.error ?? remove.error} />
+      <ErrorNote error={detail.error ?? refresh.error ?? remove.error ?? approve.error} />
       {!server ? <Spinner /> : null}
       {server ? (
         <div className="stack">
@@ -249,13 +284,37 @@ function ServerDetail({ id, onClose }: { id: string; onClose: () => void }) {
               Disabled by an admin: its tools are hidden from every client and the chat.
             </div>
           ) : null}
+          {server.pendingToolCount ? (
+            <div className="alert warning">
+              {server.pendingToolCount} tool definition
+              {server.pendingToolCount === 1 ? ' has' : 's have'} changed or appeared since they
+              were approved. Until an admin reviews them, they are hidden from every client and the
+              chat, so a server can't slip new instructions to the model.
+              {isAdmin ? (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    className="btn small"
+                    disabled={approve.isPending}
+                    onClick={() => approve.mutate(undefined)}
+                  >
+                    Approve all changes
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <h3>
             Tools <span className="muted">({detail.data?.tools.length ?? 0})</span>
           </h3>
           <div>
             {detail.data?.tools.length ? (
               detail.data.tools.map((tool) => (
-                <ToolCard key={tool.name} slug={server.slug} tool={tool} />
+                <ToolCard
+                  key={tool.name}
+                  slug={server.slug}
+                  tool={tool}
+                  onApprove={isAdmin ? () => approve.mutate([tool.name]) : undefined}
+                />
               ))
             ) : (
               <Empty>No tools known yet.</Empty>

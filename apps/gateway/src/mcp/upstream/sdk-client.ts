@@ -1,6 +1,18 @@
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
-import type { CallToolResult, UpstreamClient, UpstreamTarget, UpstreamTool } from './client';
+import {
+  Client,
+  StreamableHTTPClientTransport,
+  type FetchLike,
+} from '@modelcontextprotocol/client';
+import { Agent, fetch as undiciFetch } from 'undici';
+import type {
+  CallToolResult,
+  UpstreamClient,
+  UpstreamClientFactory,
+  UpstreamTarget,
+  UpstreamTool,
+} from './client';
 import { withTimeout } from './errors';
+import type { UpstreamUrlGuard } from './url-guard';
 
 type SdkTool = {
   name: string;
@@ -31,6 +43,7 @@ export class SdkUpstreamClient implements UpstreamClient {
   constructor(
     private readonly target: UpstreamTarget,
     private readonly onToolsChanged: (tools: UpstreamTool[]) => void,
+    private readonly fetch?: FetchLike,
   ) {}
 
   async connect(timeoutMs: number) {
@@ -49,6 +62,7 @@ export class SdkUpstreamClient implements UpstreamClient {
     );
     const transport = new StreamableHTTPClientTransport(new URL(this.target.url), {
       requestInit: { headers: this.target.headers },
+      ...(this.fetch ? { fetch: this.fetch } : {}),
     });
     try {
       await withTimeout(client.connect(transport), timeoutMs, 'connect');
@@ -88,7 +102,18 @@ export class SdkUpstreamClient implements UpstreamClient {
   }
 }
 
-export const sdkClientFactory = (
-  target: UpstreamTarget,
-  onToolsChanged: (tools: UpstreamTool[]) => void,
-) => new SdkUpstreamClient(target, onToolsChanged);
+/**
+ * Production factory: every upstream connection resolves host names through the URL guard, so a
+ * name that starts pointing at an internal address is refused when the socket opens.
+ */
+export function createSdkClientFactory(guard?: UpstreamUrlGuard): UpstreamClientFactory {
+  const dispatcher = guard ? new Agent({ connect: { lookup: guard.lookup } }) : undefined;
+  const guardedFetch: FetchLike | undefined = dispatcher
+    ? (url, init) =>
+        undiciFetch(url, { ...(init as object), dispatcher }) as unknown as Promise<Response>
+    : undefined;
+  return (target, onToolsChanged) => new SdkUpstreamClient(target, onToolsChanged, guardedFetch);
+}
+
+/** Without a guard: tests against loopback servers. */
+export const sdkClientFactory = createSdkClientFactory();

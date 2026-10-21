@@ -54,3 +54,30 @@ spec:
         - port: http
           protocol: TCP
 {{- end }}
+{{- if and .Values.global.networkPolicy.enabled .Values.global.networkPolicy.egress.enabled }}
+---
+# Egress of the pods that run WordPress code (web, bootstrap Job, wp-cron): MariaDB only. WordPress
+# itself is also told not to make outbound HTTP calls (WP_HTTP_BLOCK_EXTERNAL), so update checks
+# and marketplace widgets fail at once instead of waiting for a dropped connection.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wordpress-egress
+  labels:
+    {{- include "store.labels" (list . "wordpress") | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [wordpress, store-bootstrap, wp-cron]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "store.selectorLabels" (list . "mariadb") | nindent 14 }}
+      ports:
+        - port: 3306
+          protocol: TCP
+{{- end }}

@@ -94,6 +94,9 @@ seccompProfile:
     define('WP_ENVIRONMENT_TYPE', getenv('WP_ENVIRONMENT_TYPE') ?: 'production');
     define('DISABLE_WP_CRON', true);
     define('DISALLOW_FILE_MODS', true);
+    define('AUTOMATIC_UPDATER_DISABLED', true);
+    // Egress is closed by NetworkPolicy; refuse outbound HTTP at once instead of timing out.
+    define('WP_HTTP_BLOCK_EXTERNAL', true);
     if (getenv('TRUST_FORWARDED_PROTO') === 'true' && ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
         $_SERVER['HTTPS'] = 'on';
     }

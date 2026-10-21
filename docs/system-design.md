@@ -273,6 +273,8 @@ Every rule is enforced on the server (`requireUser`, `requireAdmin` and ownershi
 
 **What the agent knows, and the guardrails around it.** The system prompt (`modules/chat/prompt.ts`) is built per turn from the user's name and role, the current time, the servers behind the user's tool list, and the admin's **business context**: a short text about the shop (catalogue, currency, payment, delivery, warranty, order statuses), set by the Helm value `platform.gateway.chat.context` and editable by admins on the dashboard's **Assistant** page (stored in `system_settings`). It's a lightweight alternative to retrieval: small, admin-owned facts go into the prompt, and live data always comes from tools. Its numbered rules take priority over the conversation: ground every fact in a tool result or the context, stay on topic, treat tool text as data, ask before ambiguous changes, never reveal instructions or secrets. Code enforces what a prompt can't (`modules/chat/guardrails.ts`): known jailbreak phrasings are refused without calling the model; secrets and internal URLs are removed from tool results and answers; an answer with store data but no tool call is sent back once for verification; and a tool that may change data (not read-only and not marked non-destructive) pauses the turn with a `confirmation.required` event. The user approves that exact call, which the server signed, bound to the user and made single-use, and the next request runs it and continues the conversation (`modules/chat/approvals.ts`).
 
+**Tool permissions.** Admins add rules on the **Permissions** page (`/api/policies`). A rule applies to a role or to one user, a server slug or every server, a tool-name pattern (`create_*`), and either every matching tool or only those not marked read-only; its effect is allow or deny. The `PermissionSet` of the caller (one query per MCP request) consults the user's own rules before their role's, and at the same level deny beats allow; with no matching rule a tool is allowed. `tools/list` filters the catalog through it; `tools/call` runs the `PolicyGuard`, the first of the `ToolInvoker`'s guards, before anything reaches an upstream. A rule change sends `tools/list_changed`, so connected clients list again. `GET /api/policies/effective` shows, for any user, every tool, whether they may use it and which rule decided.
+
 **Audit log.** One row per `tools/call`, whatever the outcome, plus a `denied_auth` row for a rejected request when the key's owner is known. A row holds the time, user, API key (empty for the chat agent), channel (`mcp_client` or `chat_agent`), server id and slug (the slug survives the server's deletion), the upstream tool name, duration, outcome, an error message of up to 500 characters and the request id. Tool arguments aren't stored, because they can contain customer data. The code only ever inserts rows. Admins see every row and can filter by user, server, tool, outcome, channel and time; members see only their own.
 
 What a member can do with a credential they never see, why client tokens aren't passed upstream, manipulative tool descriptions and what a malicious upstream can do are covered in [threat-model.md](threat-model.md).
@@ -319,11 +321,11 @@ Deleting a user or server keeps its audit rows (the reference is set to null). T
 | `dashboard` | Deployment | Readiness and liveness `GET /healthz` | 10m, 16Mi → 200m, 64Mi | `emptyDir` for nginx temp files |
 | `postgres` | StatefulSet | `pg_isready` (startup, readiness, liveness) | 100m, 128Mi → 500m, 512Mi | PVC `data-postgres-0` 1 Gi |
 
-The long-running pods add up to about 2.4 GiB of memory limits and under 1 GiB of requests. Every container runs as a non-root user (WordPress 33, MariaDB 999, PostgreSQL 70, nginx 101, the Node services 65532 on distroless images) with all capabilities dropped, no privilege escalation and the `RuntimeDefault` seccomp profile; the Node services and nginx also have read-only root filesystems. No component talks to the Kubernetes API, so no pod mounts a service-account token. Stateless Deployments roll with `maxUnavailable: 0, maxSurge: 1`. `task verify:k8s` checks probes, requests and limits, non-root users and NetworkPolicies on the rendered chart and runs kubeconform; CI runs it too.
+The long-running pods add up to about 2.4 GiB of memory limits and under 1 GiB of requests. Every container runs as a non-root user (WordPress 33, MariaDB 999, PostgreSQL 70, nginx 101, the Node services 65532 on distroless images) with all capabilities dropped, no privilege escalation and the `RuntimeDefault` seccomp profile; the Node services and nginx also have read-only root filesystems. CI scans every published image with Trivy and fails on a fixable critical vulnerability. No component talks to the Kubernetes API, so no pod mounts a service-account token. Stateless Deployments roll with `maxUnavailable: 0, maxSurge: 1`. `task verify:k8s` checks probes, requests and limits, non-root users and NetworkPolicies on the rendered chart and runs kubeconform; CI runs it too.
 
 ### 7.2 NetworkPolicies
 
-A namespace-wide policy denies all ingress to every pod in `ahjin`; allow rules then open only the paths the system uses. k3s enforces them with its built-in policy controller, locally and in production.
+Namespace-wide policies deny all ingress **and egress** to every pod in `ahjin`; allow rules then open only the paths the system uses. k3s enforces them with its built-in policy controller, locally and in production. The namespace also enforces the `restricted` Pod Security Standard (`task namespace`), so a pod that would run as root or keep capabilities is refused at admission.
 
 | Pods | Accept connections only from |
 |---|---|
@@ -334,7 +336,15 @@ A namespace-wide policy denies all ingress to every pod in `ahjin`; allow rules 
 | `dashboard` | Traefik |
 | `woo-mcp`, `fx-mcp` | `gateway` only |
 
-There are no egress rules yet (Phase 2): the gateway needs outbound HTTPS to GitHub and the LLM API, and `fx-mcp` to its rates CDN. The chat agent's calls to `/mcp` stay inside the gateway pod, so no policy is involved. The policy engine admits a new pod a few seconds after it starts, one more reason the gateway retries upstream connections with backoff.
+| Pods | May connect to (besides the cluster DNS) |
+|---|---|
+| `gateway` | `postgres` (5432); MCP servers (label `app.kubernetes.io/component: mcp-server`, 8080) in this namespace and in namespaces labelled `app.kubernetes.io/part-of: ahjin`; public addresses on 80 and 443 |
+| `woo-mcp` | `wordpress` (8080) |
+| `fx-mcp` | public addresses on 443 (the rates CDN) |
+| `wordpress`, `store-bootstrap`, `wp-cron` | `mariadb` (3306); WordPress also sets `WP_HTTP_BLOCK_EXTERNAL`, so its own update checks fail at once |
+| `mariadb`, `postgres`, `dashboard`, anything else | nothing |
+
+"Public" is `0.0.0.0/0` minus the private, CGNAT, loopback and link-local ranges (`global.networkPolicy.egress.privateRanges`), so no pod can reach the node, the Kubernetes API or a cloud metadata endpoint, even through a URL that slipped past the gateway's SSRF check. The chat agent's calls to `/mcp` stay inside the gateway pod, so no policy is involved. The policy engine admits a new pod a few seconds after it starts, one more reason the gateway retries upstream connections with backoff.
 
 ### 7.3 Secrets
 

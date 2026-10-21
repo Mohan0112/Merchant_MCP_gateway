@@ -56,6 +56,9 @@ export function classifyError(error: unknown): Failure {
     if (e.code === 'REQUEST_TIMEOUT' || e.name === 'TimeoutError' || e.name === 'UpstreamTimeout') {
       return { reason: 'TIMEOUT', message: e.message || 'upstream did not respond in time' };
     }
+    if (e.code === 'ESSRFBLOCKED') {
+      return { reason: 'BLOCKED', message: e.message || 'address not allowed' };
+    }
     if (typeof e.code === 'string' && NETWORK[e.code]) return NETWORK[e.code]!;
     if (typeof e.code === 'string' && isTlsCode(e.code))
       return { reason: 'TLS', message: `TLS error (${e.code})` };

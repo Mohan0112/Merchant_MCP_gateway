@@ -5,6 +5,7 @@ import {
   ToolError,
   type McpHttpServer,
   type StaticCredential,
+  type ToolHandler,
 } from '@ahjin/mcp-kit';
 import * as z from 'zod';
 import { bootstrapAdmin } from '../modules/auth/users';
@@ -62,11 +63,13 @@ export async function startUpstream(
   name: string,
   credential: StaticCredential,
   port = 0,
+  /** The server reads this array on every request, so a test can change it to simulate updates. */
+  tools: ToolHandler[] = [echo, fail, slow, cancelOrder] as ToolHandler[],
 ): Promise<TestUpstream> {
   const server = createMcpHttpServer({
     name,
     version: '1.0.0',
-    tools: [echo, fail, slow, cancelOrder],
+    tools,
     credential,
     allowedHosts: ['127.0.0.1', 'localhost'],
     logger: quietLogger,

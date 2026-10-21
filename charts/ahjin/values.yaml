@@ -12,9 +12,9 @@ global:
     # Production terminates TLS at Traefik with certificates from cert-manager.
     enabled: false
     clusterIssuer: ''
-  # NetworkPolicies (plan §10.8): every pod in the namespace denies ingress by default, and each
-  # component admits only the pods it serves. This one switch turns all of them on or off.
-  # Egress stays open (Phase 2).
+  # NetworkPolicies (plan §10.8): every pod in the namespace denies ingress and egress by default,
+  # and each component admits only the pods it serves and reaches only what it needs. This one
+  # switch turns all of them on or off.
   networkPolicy:
     enabled: true
     # The ingress controller's pods, admitted to WordPress, the gateway and the dashboard.
@@ -23,6 +23,23 @@ global:
       namespace: kube-system
       podLabels:
         app.kubernetes.io/name: traefik
+    egress:
+      # Default-deny egress with per-component exceptions (Task 22).
+      enabled: true
+      # Every pod may resolve names through the cluster DNS.
+      dns:
+        namespace: kube-system
+        podLabels:
+          k8s-app: kube-dns
+      # "The internet" for the pods that need it (gateway, fx-mcp): any address except these, so
+      # pod, Service, node and cloud metadata addresses stay unreachable.
+      privateRanges:
+        - 10.0.0.0/8
+        - 100.64.0.0/10
+        - 127.0.0.0/8
+        - 169.254.0.0/16
+        - 172.16.0.0/12
+        - 192.168.0.0/16
 
 # cert-manager ClusterIssuers rendered by this chart (cert-manager itself, with its CRDs, is a
 # prerequisite installed separately). Point global.tls.clusterIssuer at one of them.
@@ -52,6 +69,12 @@ woo-mcp:
   image:
     repository: ahjin-registry:5000/ahjin-woo-mcp
     tag: dev
+  networkPolicy:
+    egress:
+      # Only the store's WordPress (REST API).
+      toPods:
+        - podLabels: { app.kubernetes.io/name: wordpress }
+          port: 8080
   env:
     WOO_BASE_URL: http://wordpress:8080
     STORE_PUBLIC_URL: '{{ .Values.global.scheme }}://store.{{ .Values.global.domain }}'
@@ -69,6 +92,10 @@ fx-mcp:
   image:
     repository: ahjin-registry:5000/ahjin-fx-mcp
     tag: dev
+  networkPolicy:
+    egress:
+      # Public HTTPS only: the exchange-rate CDN.
+      internetPorts: [443]
   secretEnv:
     FX_API_KEY: { secret: fx-mcp-auth, key: api-key }
   resources:

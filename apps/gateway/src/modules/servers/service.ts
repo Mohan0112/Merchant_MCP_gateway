@@ -7,7 +7,7 @@ import type {
   UpdateServerRequest,
   UpstreamStatus,
 } from '@ahjin/contracts';
-import { asc, count, eq } from 'drizzle-orm';
+import { asc, count, eq, sql } from 'drizzle-orm';
 import type { GatewayContext } from '../../context';
 import { upstreamServers, upstreamTools } from '../../db/schema';
 import { encryptSecret } from '../../lib/crypto';
@@ -15,23 +15,49 @@ import { badRequest, conflict, notFound } from '../../lib/errors';
 import { iso } from '../../lib/http';
 import type { UpstreamClientFactory, UpstreamTool } from '../../mcp/upstream/client';
 import { classifyError } from '../../mcp/upstream/errors';
-import { targetFor, type ServerRow, type UpstreamManager } from '../../mcp/upstream/manager';
+import {
+  targetFor,
+  toolFromRow,
+  type ReviewedTool,
+  type ServerRow,
+  type UpstreamManager,
+} from '../../mcp/upstream/manager';
+import { definitionHash } from '../../mcp/upstream/pinning';
+import { UpstreamUrlBlocked, type UpstreamUrlGuard } from '../../mcp/upstream/url-guard';
 import type { Principal } from '../auth/principal';
 
 export interface ServersDeps {
   ctx: GatewayContext;
   manager: UpstreamManager;
   factory: UpstreamClientFactory;
+  /** SSRF protection for admin-entered URLs; absent only in tests that use loopback upstreams. */
+  urlGuard?: UpstreamUrlGuard;
 }
 
-function toToolInfo(tool: UpstreamTool): ToolInfo {
+function toToolInfo({ tool, review, approved }: ReviewedTool): ToolInfo {
   return {
     name: tool.name,
     title: tool.title ?? null,
     description: tool.description ?? null,
     inputSchema: tool.inputSchema,
     annotations: tool.annotations ?? null,
+    review,
+    approved: approved
+      ? { description: approved.description ?? null, inputSchema: approved.inputSchema }
+      : null,
   };
+}
+
+/** Refuses private, loopback and metadata addresses with a reason the admin can act on. */
+async function assertUrlAllowed(deps: ServersDeps, url: string): Promise<void> {
+  try {
+    await deps.urlGuard?.check(url);
+  } catch (error) {
+    if (error instanceof UpstreamUrlBlocked) {
+      throw badRequest(error.message, [{ field: 'url', message: error.message }]);
+    }
+    throw error;
+  }
 }
 
 /** Status for the dashboard: live state if connected, otherwise what we know. Credentials never leave. */
@@ -39,7 +65,7 @@ function toServerDto(
   deps: ServersDeps,
   row: ServerRow,
   viewer: Principal,
-  storedToolCount: number,
+  stored: ToolCounts,
 ): Server {
   const state = deps.manager.state(row.id);
   const status: UpstreamStatus = !row.enabled ? 'disabled' : (state?.status ?? 'connecting');
@@ -60,18 +86,29 @@ function toServerDto(
     statusSince: state ? state.since.toISOString() : null,
     lastCheckedAt: iso(state?.lastCheckedAt ?? row.lastCheckedAt),
     protocolEra: state?.era ?? null,
-    toolCount: state?.status === 'connected' ? state.tools.length : storedToolCount,
+    toolCount: state?.status === 'connected' ? state.tools.length : stored.total,
+    pendingToolCount: stored.pending,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-async function storedToolCounts(ctx: GatewayContext): Promise<Map<string, number>> {
+interface ToolCounts {
+  total: number;
+  pending: number;
+}
+const NO_TOOLS: ToolCounts = { total: 0, pending: 0 };
+
+async function storedToolCounts(ctx: GatewayContext): Promise<Map<string, ToolCounts>> {
   const rows = await ctx.db
-    .select({ serverId: upstreamTools.serverId, total: count() })
+    .select({
+      serverId: upstreamTools.serverId,
+      total: count(),
+      pending: sql<number>`count(*) filter (where ${upstreamTools.approvedHash} is distinct from ${upstreamTools.definitionHash})`,
+    })
     .from(upstreamTools)
     .groupBy(upstreamTools.serverId);
-  return new Map(rows.map((r) => [r.serverId, r.total]));
+  return new Map(rows.map((r) => [r.serverId, { total: r.total, pending: Number(r.pending) }]));
 }
 
 async function findRow(ctx: GatewayContext, id: string): Promise<ServerRow> {
@@ -90,29 +127,36 @@ export async function listServers(deps: ServersDeps, viewer: Principal): Promise
     .from(upstreamServers)
     .orderBy(asc(upstreamServers.createdAt));
   const counts = await storedToolCounts(deps.ctx);
-  return rows.map((row) => toServerDto(deps, row, viewer, counts.get(row.id) ?? 0));
+  return rows.map((row) => toServerDto(deps, row, viewer, counts.get(row.id) ?? NO_TOOLS));
 }
 
 /** One server plus its tools: live when connected, otherwise the last known list. */
 export async function getServer(deps: ServersDeps, viewer: Principal, id: string) {
   const row = await findRow(deps.ctx, id);
-  const state = deps.manager.state(id);
-  let tools: ToolInfo[];
-  if (state?.status === 'connected') tools = state.tools.map(toToolInfo);
-  else {
+  let reviewed = deps.manager.reviewedTools(id);
+  if (!reviewed) {
     const stored = await deps.ctx.db
       .select()
       .from(upstreamTools)
       .where(eq(upstreamTools.serverId, id));
-    tools = stored.map((t) => ({
-      name: t.name,
-      title: t.title,
-      description: t.description,
-      inputSchema: t.inputSchema,
-      annotations: t.annotations,
-    }));
+    reviewed = stored.map((t) => {
+      const tool = toolFromRow(t);
+      const review =
+        t.approvedHash === null
+          ? 'new'
+          : t.approvedHash === definitionHash(tool)
+            ? 'approved'
+            : 'changed';
+      const approved = review === 'changed' ? (t.approvedDefinition as UpstreamTool | null) : null;
+      return { tool, review, ...(approved ? { approved } : {}) };
+    });
   }
-  return { server: toServerDto(deps, row, viewer, tools.length), tools };
+  const tools = reviewed.map(toToolInfo);
+  const pending = tools.filter((t) => t.review !== 'approved').length;
+  return {
+    server: toServerDto(deps, row, viewer, { total: tools.length, pending }),
+    tools,
+  };
 }
 
 function sealCredential(ctx: GatewayContext, credential: string) {
@@ -137,6 +181,7 @@ export async function createServer(
     .where(eq(upstreamServers.slug, input.slug))
     .limit(1);
   if (existing) throw conflict(`A server with slug "${input.slug}" already exists.`);
+  await assertUrlAllowed(deps, input.url);
 
   const [row] = await deps.ctx.db
     .insert(upstreamServers)
@@ -155,7 +200,7 @@ export async function createServer(
     })
     .returning();
   await deps.manager.reload(row!.id);
-  return toServerDto(deps, row!, actor, 0);
+  return toServerDto(deps, row!, actor, NO_TOOLS);
 }
 
 /** Partial update. A new credential replaces the stored one; switching to "none" erases it. */
@@ -166,6 +211,7 @@ export async function updateServer(
   input: UpdateServerRequest,
 ): Promise<Server> {
   const row = await findRow(deps.ctx, id);
+  if (input.url !== undefined && input.url !== row.url) await assertUrlAllowed(deps, input.url);
   const authType = input.authType ?? row.authType;
   const authHeaderName =
     authType === 'header' ? (input.authHeaderName ?? row.authHeaderName) : null;
@@ -194,7 +240,7 @@ export async function updateServer(
     .returning();
   await deps.manager.reload(id);
   const counts = await storedToolCounts(deps.ctx);
-  return toServerDto(deps, updated!, actor, counts.get(id) ?? 0);
+  return toServerDto(deps, updated!, actor, counts.get(id) ?? NO_TOOLS);
 }
 
 export async function deleteServer(deps: ServersDeps, id: string): Promise<void> {
@@ -213,11 +259,30 @@ export async function refreshServer(
   return (await getServer(deps, actor, id)).server;
 }
 
+/** An admin approves changed or new tool definitions, so the tools are exposed again. */
+export async function approveTools(
+  deps: ServersDeps,
+  actor: Principal,
+  id: string,
+  names?: string[],
+) {
+  await findRow(deps.ctx, id);
+  const approved = await deps.manager.approveTools(id, actor.userId, names);
+  return { approved, ...(await getServer(deps, actor, id)) };
+}
+
 /** Tries a URL and credential without saving anything; the credential is used once and dropped. */
 export async function testConnection(
   deps: ServersDeps,
   input: TestConnectionRequest,
 ): Promise<TestConnectionResult> {
+  try {
+    await deps.urlGuard?.check(input.url);
+  } catch (error) {
+    if (error instanceof UpstreamUrlBlocked)
+      return { ok: false, reason: 'BLOCKED', message: error.message };
+    throw error;
+  }
   const pseudoRow = {
     url: input.url,
     authType: input.authType,

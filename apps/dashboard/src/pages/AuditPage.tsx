@@ -15,6 +15,7 @@ const OUTCOMES: Record<AuditOutcome, { label: string; tone: string }> = {
   denied_auth: { label: 'Auth denied', tone: 'danger' },
   denied_policy: { label: 'Not allowed', tone: 'danger' },
   not_found: { label: 'Unknown tool', tone: 'warning' },
+  pending_review: { label: 'Awaiting review', tone: 'warning' },
 };
 
 const CHANNELS: Record<AuditChannel, string> = {

@@ -76,11 +76,15 @@ export class ToolCatalog extends EventEmitter {
     }
   }
 
-  /** Tools visible to a caller. Phase 2 (Task 23) filters by per-role and per-user policies here. */
+  /** Every exposed tool, sorted by name. Callers filter by the user's permissions. */
+  entries(): CatalogTool[] {
+    return [...this.tools.values()].sort((a, b) =>
+      a.definition.name.localeCompare(b.definition.name),
+    );
+  }
+
   list(): ExposedToolDefinition[] {
-    return [...this.tools.values()]
-      .map((t) => t.definition)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return this.entries().map((t) => t.definition);
   }
 
   resolve(name: string): CatalogTool | undefined {

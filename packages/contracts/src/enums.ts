@@ -33,6 +33,7 @@ export const AuditOutcomeSchema = z.enum([
   'denied_auth',
   'denied_policy',
   'not_found',
+  'pending_review',
 ]);
 export type AuditOutcome = z.infer<typeof AuditOutcomeSchema>;
 

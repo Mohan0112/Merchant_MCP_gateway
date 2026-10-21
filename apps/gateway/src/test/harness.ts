@@ -10,6 +10,7 @@ import { createDatabase, runMigrations } from '../db/client';
 import type { UpstreamClientFactory } from '../mcp/upstream/client';
 import type { ConnectionOptions } from '../mcp/upstream/connection';
 import { sdkClientFactory } from '../mcp/upstream/sdk-client';
+import type { UpstreamUrlGuard } from '../mcp/upstream/url-guard';
 import type { LlmProvider } from '../modules/chat/llm';
 
 /** Integration tests run against real PostgreSQL when TEST_DATABASE_URL is set; otherwise they skip. */
@@ -44,6 +45,7 @@ export interface HarnessOptions {
   clock?: { now: Date };
   factory?: UpstreamClientFactory;
   provider?: LlmProvider | null;
+  urlGuard?: UpstreamUrlGuard;
 }
 
 /** Fresh schema state, the full gateway app with its real module wiring, and a clock tests can move. */
@@ -69,6 +71,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
   const modules = createGatewayModules(ctx, {
     factory: options.factory ?? sdkClientFactory,
     connection: FAST_CONNECTION,
+    urlGuard: options.urlGuard,
     provider: options.provider ?? null,
     allowedHosts: ['localhost', '127.0.0.1'],
     version: 'test',

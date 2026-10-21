@@ -34,6 +34,8 @@ export const auditOutcome = pgEnum('audit_outcome', [
   'denied_auth',
   'denied_policy',
   'not_found',
+  /** The tool's definition changed since an admin approved it (definition pinning). */
+  'pending_review',
 ]);
 
 export const users = pgTable(
@@ -120,6 +122,8 @@ export const upstreamServers = pgTable('upstream_servers', {
   lastStatus: text('last_status'),
   lastError: text('last_error'),
   lastCheckedAt: at('last_checked_at'),
+  /** First successful tool listing. Tools seen then are trusted; later changes need an admin. */
+  toolsPinnedAt: at('tools_pinned_at'),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: at('created_at').notNull().defaultNow(),
   updatedAt: at('updated_at').notNull().defaultNow(),
@@ -137,8 +141,13 @@ export const upstreamTools = pgTable(
     inputSchema: jsonb('input_schema'),
     outputSchema: jsonb('output_schema'),
     annotations: jsonb('annotations'),
-    /** Hash of the definition, used by Phase 2 tool pinning. */
+    /** Hash of the current definition (name, title, description, schemas, annotations). */
     definitionHash: text('definition_hash'),
+    /** The definition an admin approved, or the first one seen. Exposed only while it matches. */
+    approvedDefinition: jsonb('approved_definition'),
+    approvedHash: text('approved_hash'),
+    approvedAt: at('approved_at'),
+    approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
     fetchedAt: at('fetched_at').notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.serverId, t.name] })],
@@ -166,6 +175,34 @@ export const auditLogs = pgTable(
     index('audit_logs_user_idx').on(t.userId, t.occurredAt.desc()),
     index('audit_logs_server_idx').on(t.serverId, t.occurredAt.desc()),
   ],
+);
+
+export const policySubject = pgEnum('policy_subject', ['role', 'user']);
+export const policyScope = pgEnum('policy_scope', ['all', 'writes']);
+export const policyEffect = pgEnum('policy_effect', ['allow', 'deny']);
+
+/**
+ * Tool permissions (Task 23). A rule applies to a role or to one user, a server slug ('*' for
+ * every server) and a tool-name pattern ('*' wildcards), optionally only to tools that may change
+ * data. A user's own rules take precedence over their role's; at the same level, deny beats allow;
+ * with no matching rule a tool is allowed.
+ */
+export const toolPolicies = pgTable(
+  'tool_policies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    subjectType: policySubject('subject_type').notNull(),
+    role: userRole('role'),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    serverSlug: text('server_slug').notNull().default('*'),
+    toolPattern: text('tool_pattern').notNull().default('*'),
+    scope: policyScope('scope').notNull().default('all'),
+    effect: policyEffect('effect').notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('tool_policies_user_idx').on(t.userId)],
 );
 
 export const systemSettings = pgTable('system_settings', {

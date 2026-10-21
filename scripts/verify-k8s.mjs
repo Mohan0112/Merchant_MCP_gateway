@@ -8,7 +8,8 @@
 // (local, production, and production + rehearsal). It fails when a long-running container has no readiness or liveness probe, when any container
 // (init containers, Jobs and CronJobs included) lacks CPU and memory requests and limits, when a pod
 // may run as root or keeps privilege escalation or capabilities, when NetworkPolicies are on but a
-// Service's pods aren't admitted by an allow policy or the namespace default deny is missing, and
+// Service's pods aren't admitted by an allow policy or the namespace default deny (ingress, and
+// egress when its policies are rendered) is missing, when an egress rule reaches anywhere, and
 // when a values file holds what looks like a secret instead of a Secret's name.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -144,6 +145,33 @@ function checkNetworkPolicies(render, objects, workloads) {
       }
     }
   }
+  // Egress (Task 22): once any egress policy exists, there must be a namespace-wide default deny,
+  // and no rule may reach everywhere: no peers at all, or 0.0.0.0/0 without private exceptions.
+  const egressPolicies = policies.filter((p) => (p.spec?.policyTypes ?? []).includes('Egress'));
+  if (egressPolicies.length) {
+    const denyEgress = egressPolicies.some(
+      (p) => Object.keys(p.spec?.podSelector ?? {}).length === 0 && !(p.spec?.egress ?? []).length,
+    );
+    if (!denyEgress) problem(render, 'egress policies exist but no namespace-wide default deny');
+    for (const policy of egressPolicies) {
+      for (const rule of policy.spec?.egress ?? []) {
+        if (!(rule.to ?? []).length) {
+          problem(render, `NetworkPolicy/${policy.metadata.name} has an egress rule to anywhere`);
+        }
+        for (const peer of rule.to ?? []) {
+          if (peer.ipBlock?.cidr === '0.0.0.0/0' && !(peer.ipBlock.except ?? []).length) {
+            problem(
+              render,
+              `NetworkPolicy/${policy.metadata.name} reaches the whole internet, private ranges included`,
+            );
+          }
+        }
+        if (!(rule.ports ?? []).length) {
+          problem(render, `NetworkPolicy/${policy.metadata.name} has an egress rule without ports`);
+        }
+      }
+    }
+  }
   // Every pod behind a Service must be admitted by some allow policy, or the Service is dead.
   for (const service of objects.filter((o) => o.kind === 'Service')) {
     const selector = service.spec?.selector;
@@ -163,7 +191,7 @@ function checkNetworkPolicies(render, objects, workloads) {
 }
 
 // Values hold Secret *names* and keys only (ADR-0008); a literal under a secret-like key is a leak.
-const SECRET_KEY = /pass(word)?|secret|token|api[-_]?key|pepper|salt|private/i;
+const SECRET_KEY = /pass(word)?|secret|token|api[-_]?key|pepper|salt|private[-_]?key/i;
 const K8S_NAME = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/;
 
 function checkValuesFiles() {

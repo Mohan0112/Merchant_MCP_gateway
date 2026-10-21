@@ -164,6 +164,8 @@ export const TestConnectionRequestSchema = z
 export type TestConnectionRequest = z.infer<typeof TestConnectionRequestSchema>;
 
 export const UnreachableReasonSchema = z.enum([
+  /** The URL resolves to a private, loopback or link-local address (SSRF guard). */
+  'BLOCKED',
   'DNS',
   'CONNECTION_REFUSED',
   'TIMEOUT',
@@ -174,12 +176,19 @@ export const UnreachableReasonSchema = z.enum([
 ]);
 export type UnreachableReason = z.infer<typeof UnreachableReasonSchema>;
 
+export const ToolReviewSchema = z.enum(['approved', 'changed', 'new']);
+export type ToolReview = z.infer<typeof ToolReviewSchema>;
+
 export const ToolInfoSchema = z.object({
   name: z.string(),
   title: z.string().nullable(),
   description: z.string().nullable(),
   inputSchema: z.unknown(),
   annotations: z.unknown().nullable(),
+  /** Definition pinning: only approved tools are exposed; changed and new ones wait for an admin. */
+  review: ToolReviewSchema,
+  /** For a changed tool: what was approved before, to compare. */
+  approved: z.object({ description: z.string().nullable(), inputSchema: z.unknown() }).nullable(),
 });
 export type ToolInfo = z.infer<typeof ToolInfoSchema>;
 
@@ -202,10 +211,18 @@ export const ServerSchema = z.object({
   lastCheckedAt: z.string().nullable(),
   protocolEra: z.enum(['modern', 'legacy']).nullable(),
   toolCount: z.number(),
+  /** Tools whose definition changed or appeared since an admin approved the server's tools. */
+  pendingToolCount: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type Server = z.infer<typeof ServerSchema>;
+
+/** Approve the current definition of the named tools, or of every tool awaiting review. */
+export const ApproveToolsRequestSchema = z.object({
+  names: z.array(z.string().min(1).max(200)).min(1).max(500).optional(),
+});
+export type ApproveToolsRequest = z.infer<typeof ApproveToolsRequestSchema>;
 
 export const TestConnectionResultSchema = z.discriminatedUnion('ok', [
   z.object({
@@ -217,6 +234,61 @@ export const TestConnectionResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), reason: UnreachableReasonSchema, message: z.string() }),
 ]);
 export type TestConnectionResult = z.infer<typeof TestConnectionResultSchema>;
+
+// ---------- Tool permissions ----------
+
+/** A server slug or '*' for every server. */
+const PolicyServerSchema = z.union([z.literal('*'), SlugSchema]);
+/** An upstream tool name, with '*' as a wildcard: 'create_*', 'list_orders', '*'. */
+const ToolPatternSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9_*.-]{1,128}$/, "Use a tool name, with * as a wildcard (e.g. create_*)");
+
+export const PolicySchema = z.object({
+  id: z.uuid(),
+  subjectType: z.enum(['role', 'user']),
+  role: RoleSchema.nullable(),
+  userId: z.uuid().nullable(),
+  userEmail: z.string().nullable(),
+  server: z.string(),
+  tool: z.string(),
+  /** 'writes': only tools that aren't marked read-only (MCP readOnlyHint). */
+  scope: z.enum(['all', 'writes']),
+  effect: z.enum(['allow', 'deny']),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type Policy = z.infer<typeof PolicySchema>;
+
+export const CreatePolicyRequestSchema = z
+  .object({
+    subjectType: z.enum(['role', 'user']),
+    role: RoleSchema.optional(),
+    userId: z.uuid().optional(),
+    server: PolicyServerSchema.default('*'),
+    tool: ToolPatternSchema.default('*'),
+    scope: z.enum(['all', 'writes']).default('all'),
+    effect: z.enum(['allow', 'deny']),
+    note: z.string().trim().max(200).optional(),
+  })
+  .refine((p) => (p.subjectType === 'role' ? p.role : p.userId), {
+    message: 'Choose the role or the user the rule applies to',
+    path: ['subjectType'],
+  });
+export type CreatePolicyRequest = z.input<typeof CreatePolicyRequestSchema>;
+
+/** One tool as a particular user may (or may not) use it, and the rule that decided. */
+export const EffectiveToolSchema = z.object({
+  name: z.string(),
+  server: z.string(),
+  tool: z.string(),
+  readOnly: z.boolean(),
+  allowed: z.boolean(),
+  /** The deciding rule; null when no rule matched (allowed by default). */
+  policyId: z.uuid().nullable(),
+});
+export type EffectiveTool = z.infer<typeof EffectiveToolSchema>;
 
 // ---------- Audit log ----------
 

@@ -143,10 +143,25 @@ tasks:
     cmds:
       - node scripts/verify-k8s.mjs {{.CLI_ARGS}}
 
+  namespace:
+    desc: Create the release namespace with the restricted Pod Security Standard enforced (task namespace KUBE_CONTEXT=<context>)
+    requires:
+      vars: [KUBE_CONTEXT]
+    cmds:
+      - kubectl --context {{.KUBE_CONTEXT}} create namespace {{.NAMESPACE}} --dry-run=client -o yaml | kubectl --context {{.KUBE_CONTEXT}} apply -f -
+      # Pods that run as root, escalate privileges, keep capabilities or lack a seccomp profile are
+      # refused at admission, whatever the chart says.
+      - >-
+        kubectl --context {{.KUBE_CONTEXT}} label namespace {{.NAMESPACE}} --overwrite
+        pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=latest
+        pod-security.kubernetes.io/warn=restricted app.kubernetes.io/part-of=ahjin
+
   deploy:local:
     desc: Install or upgrade the release on the local cluster
     cmds:
       - kubectl config use-context {{.CONTEXT}}
+      - task: namespace
+        vars: { KUBE_CONTEXT: '{{.CONTEXT}}' }
       - >-
         helm upgrade --install {{.RELEASE}} {{.CHART}}
         --namespace {{.NAMESPACE}} --create-namespace
@@ -202,6 +217,8 @@ tasks:
   rehearsal:deploy:
     desc: Install the chart on the rehearsal cluster with values-prod.yaml + values-rehearsal.yaml and CI's GHCR images
     cmds:
+      - task: namespace
+        vars: { KUBE_CONTEXT: '{{.REHEARSAL_CONTEXT}}' }
       - node scripts/secrets.mjs --context={{.REHEARSAL_CONTEXT}} --namespace={{.NAMESPACE}}
       - >-
         helm upgrade --install {{.RELEASE}} {{.CHART}} --kube-context {{.REHEARSAL_CONTEXT}}
@@ -228,6 +245,8 @@ tasks:
       ISSUER: '{{.ISSUER | default "letsencrypt-prod"}}'
     cmds:
       - echo "Deploying images {{.IMAGE_TAG}} to {{.DOMAIN}} on context {{.PROD_CONTEXT}} (issuer {{.ISSUER}})"
+      - task: namespace
+        vars: { KUBE_CONTEXT: '{{.PROD_CONTEXT}}' }
       - >-
         helm upgrade --install {{.RELEASE}} {{.CHART}} --kube-context {{.PROD_CONTEXT}}
         --namespace {{.NAMESPACE}} --create-namespace -f {{.CHART}}/values-prod.yaml

@@ -2,7 +2,6 @@
 {{- $ic := .Values.global.networkPolicy.ingressController }}
 # Deny all ingress to every pod in the namespace. Each component's own policy then admits only the
 # pods it serves (plan §10.8), so a new or forgotten workload starts closed rather than open.
-# Egress is not restricted yet (Phase 2).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -12,6 +11,47 @@ metadata:
 spec:
   podSelector: {}
   policyTypes: [Ingress]
+{{- with .Values.global.networkPolicy.egress }}
+{{- if .enabled }}
+---
+# The same for egress: a pod may open connections only where its component's policy allows
+# (Task 22), so a compromised pod can't reach the database of another component, the node, the
+# Kubernetes API or a cloud metadata endpoint.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  labels:
+    {{- include "ahjin.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+---
+# Every pod may use the cluster DNS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  labels:
+    {{- include "ahjin.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+{{- end }}
+{{- end }}
 {{- if .Values.global.tls.enabled }}
 ---
 # cert-manager's HTTP-01 solver: while a certificate is issued, cert-manager runs a short-lived pod

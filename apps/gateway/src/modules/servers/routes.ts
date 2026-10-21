@@ -1,4 +1,5 @@
 import {
+  ApproveToolsRequestSchema,
   CreateServerRequestSchema,
   TestConnectionRequestSchema,
   UpdateServerRequestSchema,
@@ -8,6 +9,7 @@ import * as z from 'zod';
 import { parse } from '../../lib/http';
 import { requireAdmin, requireUser } from '../auth/principal';
 import {
+  approveTools,
   createServer,
   deleteServer,
   getServer,
@@ -53,6 +55,13 @@ export function registerServerRoutes(app: FastifyInstance, deps: ServersDeps) {
   app.post('/api/servers/:id/refresh', async (request) => {
     const actor = requireAdmin(request);
     return { server: await refreshServer(deps, actor, parse(IdParams, request.params).id) };
+  });
+
+  app.post('/api/servers/:id/tools/approve', async (request) => {
+    const actor = requireAdmin(request);
+    const { id } = parse(IdParams, request.params);
+    const { names } = parse(ApproveToolsRequestSchema, request.body ?? {});
+    return approveTools(deps, actor, id, names);
   });
 
   app.post('/api/servers/test', async (request) => {

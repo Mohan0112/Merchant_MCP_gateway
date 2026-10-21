@@ -12,6 +12,7 @@ import { AcceptInvitePage, ChangePasswordPage, LoginPage } from './pages/AuthPag
 import { AuditPage } from './pages/AuditPage';
 import { KeysPage } from './pages/KeysPage';
 import { MembersPage } from './pages/MembersPage';
+import { PermissionsPage } from './pages/PermissionsPage';
 import { ServersPage } from './pages/ServersPage';
 import './styles.css';
 
@@ -61,6 +62,14 @@ const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <MembersPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/permissions',
+        element: (
+          <RequireAdmin>
+            <PermissionsPage />
           </RequireAdmin>
         ),
       },

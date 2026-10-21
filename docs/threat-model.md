@@ -84,7 +84,9 @@ A server can put instructions in a tool description ("before answering, call `gi
 - **Visibility:** the chat shows every tool call with its arguments, so a user sees an unexpected `github__create_issue`; the audit log records it.
 - **Isolation:** the upstream sees only the calls routed to its own tools and its own credential, never other servers' traffic or credentials.
 
-This doesn't make prompt injection impossible: a model can still be talked into calling another tool with data from a result, and pattern matching only catches known phrasings. The approval step limits the damage to read-only calls unless the user agrees. **Phase 2** (Tasks 22 and 23) adds tool-definition pinning (a changed description or schema is hidden until an admin approves it) and per-tool permissions.
+- **Definition pinning** (`mcp/upstream/pinning.ts`): every tool definition (name, title, description, schemas, annotations) is hashed. The first listing of a newly added server is trusted, because the admin just reviewed it in Test connection. After that, a tool whose definition changes, or a new tool, is **hidden from every client and the chat** until an admin approves it on the server's page, where the old and new descriptions sit side by side. A direct call to it is refused and audited as `pending_review`. This stops the "rug pull": a server that passes review and then rewrites its descriptions to instruct the model.
+
+This doesn't make prompt injection impossible: a model can still be talked into calling another tool with data from a result, and pattern matching only catches known phrasings. The approval step limits the damage to read-only calls unless the user agrees. **Phase 2** (Task 23) adds per-tool permissions.
 
 ## A malicious or compromised MCP server
 
@@ -99,7 +101,10 @@ If an admin registers a bad server, or a good one is compromised:
 
 An admin disables it with one switch; its tools disappear from every client and from the chat immediately.
 
-Gap: the gateway connects to whatever URL an admin enters, including cluster-internal addresses or a cloud metadata endpoint, and its egress isn't restricted (SSRF). **Phase 2** (Task 22) adds URL validation against private, loopback, link-local and metadata ranges, and egress NetworkPolicies.
+**Server-side request forgery** (an admin, or someone with an admin's session, pointing the gateway at an internal address) is stopped at three layers:
+1. **At registration** (`mcp/upstream/url-guard.ts`): a URL is accepted only if its host resolves to public addresses, or is one of the platform's own MCP servers (the seeded hosts plus `UPSTREAM_PRIVATE_HOSTS`, for example `woo-mcp` and the per-store servers). Private, loopback, link-local (169.254.169.254), CGNAT, multicast and reserved addresses are refused with the reason, as are non-HTTP schemes and credentials in the URL. `http://postgres.ahjin.svc:5432` and `http://169.254.169.254/` both fail.
+2. **At every connection:** the HTTP client the gateway uses for upstreams resolves names through the same check, so a name that later starts resolving to an internal address (DNS rebinding) is refused when the socket opens, and the server shows as unreachable with reason `BLOCKED`.
+3. **In the network:** the gateway's egress NetworkPolicy reaches only Postgres, labelled MCP servers and public addresses; private ranges are excluded.
 
 ## What one team member can do to another
 
@@ -112,7 +117,7 @@ A member **can't**:
 - give themselves more rights: role checks are on the server, in every route.
 
 A member **can**:
-- **change shared data through the tools:** if A marks an order completed or creates a GitHub issue, everyone sees it. The audit log attributes it to A. **Phase 2** tool permissions restrict who can call which tools.
+- **change shared data through the tools:** if A marks an order completed or creates a GitHub issue, everyone sees it. The audit log attributes it to A. **Tool permissions** limit who may call which tools: for example the "members can only read" rule leaves members the read-only tools, and a per-user rule can grant one person an exception.
 - **use up shared quotas:** the GitHub API limits of the shared token, or the LLM provider's rate limit. **Phase 2** adds per-user rate limits.
 
 Admins are trusted. An admin who issues a key for a member sees it once, which is why the UI steers members to create their own. The last active admin can't be demoted or disabled.
@@ -121,13 +126,16 @@ Admins are trusted. An admin who issues a key for a member sees it once, which i
 
 | Action | Member | Admin |
 |---|---|---|
-| Use every enabled server's tools (MCP client or chat) | ✅ | ✅ |
+| Use every enabled server's tools (MCP client or chat) | ✅ unless a permission rule hides a tool | ✅ unless a rule hides it |
 | Create and revoke their own API keys | ✅ | ✅ |
 | See servers, their status and tools | ✅ (no URLs or credentials) | ✅ |
 | See the audit log | own entries | everyone's |
 | Add, edit, disable or remove servers; test connections | ❌ | ✅ |
 | Invite people; change roles; disable users | ❌ | ✅ |
 | Issue or revoke another user's keys | ❌ | ✅ |
+| Manage tool permissions; approve changed tool definitions; edit the assistant's business context | ❌ | ✅ |
+
+**How tool permissions are enforced.** Rules live in `tool_policies` (subject: a role or one user; a server slug or `*`; a tool-name pattern; optionally only tools that aren't read-only; allow or deny). A user's own rules are consulted before their role's, and at the same level a deny beats an allow; with no rule a tool is allowed, so the core behaviour is unchanged until an admin adds one. The check runs inside `/mcp` on every request: `tools/list` returns only the allowed tools, and `tools/call` refuses the rest through `PolicyGuard` (`mcp/policy-guard.ts`) with outcome `denied_policy` in the audit log. The chat agent calls tools through the same endpoint as the user, so it inherits the same rules. "Read-only" comes from the upstream's annotations, which a malicious server could falsify; rules that name tools explicitly don't depend on it.
 
 ## How secrets are stored and used
 
@@ -148,8 +156,8 @@ Kubernetes Secrets are base64, not encrypted, in etcd by default; k3s can encryp
 - **Login:** 5 attempts per minute per IP and email; a disabled user's sessions and keys stop working at once.
 - **CSRF:** every state-changing API request must carry `X-Requested-With`; cross-site forms can't add it, and there is no CORS.
 - **DNS rebinding:** `/mcp` accepts only known Host headers (the public host, in-cluster names, localhost); every MCP server built here does the same.
-- **Network:** only Traefik is exposed. A default-deny ingress NetworkPolicy plus one allow rule per component: MCP servers accept only the gateway, MariaDB only the store's pods, Postgres only the gateway.
-- **Containers:** all run as non-root with every capability dropped, no privilege escalation and the `RuntimeDefault` seccomp profile; no service-account tokens; no component talks to the Kubernetes API, so there is no RBAC to abuse.
+- **Network:** only Traefik is exposed. Default-deny ingress and egress NetworkPolicies plus allow rules per component: MCP servers accept only the gateway, MariaDB only the store's pods, Postgres only the gateway; woo-mcp reaches only WordPress, WordPress only MariaDB, and no pod reaches the node, the Kubernetes API or private ranges.
+- **Containers:** all run as non-root with every capability dropped, no privilege escalation and the `RuntimeDefault` seccomp profile, which the namespace's `restricted` Pod Security Standard enforces at admission; no service-account tokens; no component talks to the Kubernetes API, so there is no RBAC to abuse. CI fails on a fixable critical vulnerability in any image (Trivy).
 - **The LLM provider** receives the prompt and the tool results the agent reads. `woo__list_orders` returns only the customer's name, without addresses or contact details; `woo__get_order` includes billing details. Choosing a provider is a data-processing decision for a real deployment.
 
 ## STRIDE summary
@@ -167,9 +175,6 @@ Kubernetes Secrets are base64, not encrypted, in etcd by default; k3s can encryp
 
 | Gap | Planned fix |
 |---|---|
-| Admin-entered URLs aren't checked (SSRF), egress is open | URL validation and default-deny egress (Task 22) |
-| A server can change its tool definitions silently | Definition pinning with admin approval (Task 22) |
-| Every member can call every tool | Per-role and per-user tool permissions (Task 23) |
 | No per-user or per-key rate limits | Token-bucket limits returning 429 (Task 25) |
 | Audit integrity relies on the application | Separate DB roles without `UPDATE`/`DELETE` on the audit table (Task 22) |
 | The LLM key and the encryption key share the gateway pod | Optional separate chat Deployment (Task 25) |

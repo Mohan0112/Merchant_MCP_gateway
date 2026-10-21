@@ -1,10 +1,11 @@
 import { createLogger } from '@ahjin/logger';
 import { buildApp } from './app';
 import { createGatewayModules, shutdown } from './compose';
-import { loadConfig, mcpAllowedHosts, type Config } from './config';
+import { loadConfig, mcpAllowedHosts, upstreamPrivateHosts, type Config } from './config';
 import type { GatewayContext } from './context';
 import { createDatabase, createPool, pingDatabase } from './db/client';
-import { sdkClientFactory } from './mcp/upstream/sdk-client';
+import { createSdkClientFactory } from './mcp/upstream/sdk-client';
+import { UpstreamUrlGuard } from './mcp/upstream/url-guard';
 import { bootstrapAdmin } from './modules/auth/users';
 import { FallbackProvider, OpenAiCompatibleProvider, type LlmProvider } from './modules/chat/llm';
 import { seedUpstreams } from './modules/servers/seed';
@@ -53,10 +54,12 @@ async function main() {
   await bootstrapAdmin(ctx, config.BOOTSTRAP_ADMIN_EMAIL, config.BOOTSTRAP_ADMIN_PASSWORD);
   await seedUpstreams(ctx, config.SEED_UPSTREAMS, process.env);
 
+  const urlGuard = new UpstreamUrlGuard(upstreamPrivateHosts(config));
   const provider = createLlmProvider(config);
   logger.info({ llm: provider?.name ?? 'none' }, 'chat agent configured');
   const modules = createGatewayModules(ctx, {
-    factory: sdkClientFactory,
+    factory: createSdkClientFactory(urlGuard),
+    urlGuard,
     provider,
     assistantContext: config.CHAT_CONTEXT,
     allowedHosts: mcpAllowedHosts(config),

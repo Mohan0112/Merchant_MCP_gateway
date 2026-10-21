@@ -21,6 +21,15 @@ networkPolicy:
   # global.networkPolicy.enabled is on (the umbrella chart's single switch for every policy).
   allowFromPods:
     - app.kubernetes.io/name: gateway
+  # Namespace of the gateway when the server runs in another namespace (per-store and hosted
+  # servers); empty means the release's own namespace.
+  gatewayNamespace: ''
+  # What the server may connect to, besides DNS (when global.networkPolicy.egress.enabled):
+  egress:
+    # Pods in the same namespace: [{ podLabels: {...}, port: 8080 }]
+    toPods: []
+    # Public internet on these TCP ports (private and metadata ranges excluded). Empty: none.
+    internetPorts: []
 
 resources:
   requests: { cpu: 25m, memory: 64Mi }

@@ -1,8 +1,8 @@
 import { EventEmitter } from 'node:events';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import type { GatewayContext } from '../../context';
 import { upstreamServers, upstreamTools } from '../../db/schema';
-import { decryptSecret, sha256 } from '../../lib/crypto';
+import { decryptSecret } from '../../lib/crypto';
 import type { UpstreamClientFactory, UpstreamTarget, UpstreamTool } from './client';
 import {
   DEFAULT_CONNECTION_OPTIONS,
@@ -10,8 +10,10 @@ import {
   type ConnectionOptions,
   type ConnectionState,
 } from './connection';
+import { definitionHash, ToolPins, type ApprovedTool, type ToolReview } from './pinning';
 
 export type ServerRow = typeof upstreamServers.$inferSelect;
+type ToolRow = typeof upstreamTools.$inferSelect;
 
 /** A connected upstream as the catalog sees it. */
 export interface LiveUpstream {
@@ -21,6 +23,26 @@ export interface LiveUpstream {
   timeoutMs: number;
   tools: UpstreamTool[];
   connection: UpstreamConnection;
+}
+
+/** A tool with its pinning state, for the dashboard. */
+export interface ReviewedTool {
+  tool: UpstreamTool;
+  review: ToolReview;
+  /** The definition an admin approved, when it differs from the current one. */
+  approved?: UpstreamTool;
+}
+
+/** A stored tool row as the definition the upstream sent. */
+export function toolFromRow(row: ToolRow): UpstreamTool {
+  return {
+    name: row.name,
+    title: row.title ?? undefined,
+    description: row.description ?? undefined,
+    inputSchema: (row.inputSchema ?? { type: 'object' }) as Record<string, unknown>,
+    outputSchema: (row.outputSchema as Record<string, unknown> | null) ?? undefined,
+    annotations: (row.annotations as Record<string, unknown> | null) ?? undefined,
+  };
 }
 
 /** Builds the request headers that carry an upstream's credential. Never leaves the gateway. */
@@ -39,13 +61,19 @@ export function targetFor(row: ServerRow, credentialKey: Buffer): UpstreamTarget
   return { url: row.url, headers };
 }
 
+interface LiveEntry {
+  row: ServerRow;
+  connection: UpstreamConnection;
+  pins: ToolPins;
+}
+
 /**
  * Owns one UpstreamConnection per enabled server. Persists status changes and tool lists so the
- * dashboard shows sensible data after a restart, and emits `catalog.changed` whenever the set of
- * available tools may have changed.
+ * dashboard shows sensible data after a restart, keeps each server's approved tool definitions
+ * (pinning), and emits `catalog.changed` whenever the set of available tools may have changed.
  */
 export class UpstreamManager extends EventEmitter {
-  private readonly live = new Map<string, { row: ServerRow; connection: UpstreamConnection }>();
+  private readonly live = new Map<string, LiveEntry>();
 
   constructor(
     private readonly ctx: GatewayContext,
@@ -57,7 +85,7 @@ export class UpstreamManager extends EventEmitter {
 
   async start(): Promise<void> {
     const rows = await this.ctx.db.select().from(upstreamServers);
-    for (const row of rows) if (row.enabled) this.open(row);
+    await Promise.all(rows.filter((row) => row.enabled).map((row) => this.open(row)));
     this.ctx.logger.info(
       { servers: rows.length, enabled: this.live.size },
       'upstream manager started',
@@ -72,7 +100,7 @@ export class UpstreamManager extends EventEmitter {
       .from(upstreamServers)
       .where(eq(upstreamServers.id, serverId))
       .limit(1);
-    if (row?.enabled) this.open(row);
+    if (row?.enabled) await this.open(row);
     else if (row)
       await this.persistStatus(row.id, { status: 'disabled', reason: null, message: null });
     this.emit('catalog.changed');
@@ -87,10 +115,10 @@ export class UpstreamManager extends EventEmitter {
     return this.live.get(serverId)?.connection.snapshot();
   }
 
-  /** Every connected server with its current tools. */
+  /** Every connected server with the tools it may expose (approved definitions only). */
   connected(): LiveUpstream[] {
     const result: LiveUpstream[] = [];
-    for (const { row, connection } of this.live.values()) {
+    for (const { row, connection, pins } of this.live.values()) {
       const state = connection.snapshot();
       if (state.status !== 'connected') continue;
       result.push({
@@ -98,7 +126,7 @@ export class UpstreamManager extends EventEmitter {
         slug: row.slug,
         displayName: row.displayName,
         timeoutMs: row.timeoutMs,
-        tools: state.tools,
+        tools: pins.visible(state.tools),
         connection,
       });
     }
@@ -106,18 +134,107 @@ export class UpstreamManager extends EventEmitter {
   }
 
   /** The server behind a slug, whatever its state (used to explain why a tool is unavailable). */
-  bySlug(slug: string): { row: ServerRow; state: ConnectionState } | undefined {
-    for (const { row, connection } of this.live.values()) {
-      if (row.slug === slug) return { row, state: connection.snapshot() };
+  bySlug(
+    slug: string,
+  ):
+    | { row: ServerRow; state: ConnectionState; review(tool: string): ToolReview | null }
+    | undefined {
+    for (const { row, connection, pins } of this.live.values()) {
+      if (row.slug !== slug) continue;
+      const state = connection.snapshot();
+      return {
+        row,
+        state,
+        review: (name) => {
+          const tool = state.tools.find((t) => t.name === name);
+          return tool ? pins.review(tool) : null;
+        },
+      };
     }
     return undefined;
+  }
+
+  /** The live tools of a connected server with their pinning state, or null when not connected. */
+  reviewedTools(serverId: string): ReviewedTool[] | null {
+    const entry = this.live.get(serverId);
+    const state = entry?.connection.snapshot();
+    if (!entry || state?.status !== 'connected') return null;
+    return state.tools.map((tool) => {
+      const review = entry.pins.review(tool);
+      const approved = review === 'changed' ? entry.pins.approvedDefinition(tool.name) : undefined;
+      return { tool, review, ...(approved ? { approved } : {}) };
+    });
+  }
+
+  /**
+   * An admin approves the current definition of some (or all) tools awaiting review. Returns how
+   * many were approved. Works for servers that aren't connected too, from the stored definitions.
+   */
+  async approveTools(serverId: string, actorId: string, names?: string[]): Promise<number> {
+    const entry = this.live.get(serverId);
+    const state = entry?.connection.snapshot();
+    const current =
+      state?.status === 'connected'
+        ? state.tools
+        : (
+            await this.ctx.db
+              .select()
+              .from(upstreamTools)
+              .where(eq(upstreamTools.serverId, serverId))
+          ).map(toolFromRow);
+    const pins = entry?.pins ?? (await this.loadPins(serverId, true));
+    const targets = current.filter(
+      (tool) => (!names || names.includes(tool.name)) && pins.review(tool) !== 'approved',
+    );
+    for (const tool of targets) {
+      await this.ctx.db
+        .update(upstreamTools)
+        .set({
+          approvedDefinition: tool,
+          approvedHash: definitionHash(tool),
+          approvedAt: this.ctx.now(),
+          approvedBy: actorId,
+        })
+        .where(and(eq(upstreamTools.serverId, serverId), eq(upstreamTools.name, tool.name)));
+      pins.approve(tool);
+    }
+    if (targets.length) {
+      this.ctx.logger.info(
+        { serverId, tools: targets.map((t) => t.name), actorId },
+        'tool definitions approved',
+      );
+      this.emit('catalog.changed');
+    }
+    return targets.length;
   }
 
   async stopAll(): Promise<void> {
     await Promise.all([...this.live.keys()].map((id) => this.close(id)));
   }
 
-  private open(row: ServerRow): void {
+  private async loadPins(serverId: string, pinned: boolean): Promise<ToolPins> {
+    const rows = await this.ctx.db
+      .select({
+        name: upstreamTools.name,
+        approvedDefinition: upstreamTools.approvedDefinition,
+        approvedHash: upstreamTools.approvedHash,
+      })
+      .from(upstreamTools)
+      .where(eq(upstreamTools.serverId, serverId));
+    const approved = new Map<string, ApprovedTool>();
+    for (const r of rows) {
+      if (r.approvedDefinition && r.approvedHash) {
+        approved.set(r.name, {
+          hash: r.approvedHash,
+          definition: r.approvedDefinition as UpstreamTool,
+        });
+      }
+    }
+    return new ToolPins(approved, pinned);
+  }
+
+  private async open(row: ServerRow): Promise<void> {
+    const pins = await this.loadPins(row.id, row.toolsPinnedAt !== null);
     let target: UpstreamTarget;
     try {
       target = targetFor(row, this.ctx.settings.credentialKey);
@@ -135,7 +252,7 @@ export class UpstreamManager extends EventEmitter {
       this.options,
       this.ctx.now,
     );
-    this.live.set(row.id, { row, connection });
+    this.live.set(row.id, { row, connection, pins });
     connection.start();
   }
 
@@ -151,7 +268,8 @@ export class UpstreamManager extends EventEmitter {
     connection: UpstreamConnection,
     change: 'status' | 'tools',
   ): void {
-    if (this.live.get(row.id)?.connection !== connection) return; // a replaced connection
+    const entry = this.live.get(row.id);
+    if (entry?.connection !== connection) return; // a replaced connection
     const state = connection.snapshot();
     if (change === 'status') {
       const log = state.status === 'unreachable' ? this.ctx.logger.warn : this.ctx.logger.info;
@@ -162,8 +280,24 @@ export class UpstreamManager extends EventEmitter {
       );
       void this.persistStatus(row.id, state);
     }
-    if (state.status === 'connected') void this.persistTools(row.id, state.tools);
+    if (state.status === 'connected') {
+      // The first listing of a server is trusted; later changes wait for an admin.
+      const trustAll = !entry.pins.isPinned;
+      if (trustAll) entry.pins.trustAll(state.tools);
+      else this.logPendingReview(row, entry.pins, state.tools);
+      void this.persistTools(row.id, state.tools, trustAll);
+    }
     this.emit('catalog.changed');
+  }
+
+  private logPendingReview(row: ServerRow, pins: ToolPins, tools: UpstreamTool[]): void {
+    const pending = tools.filter((tool) => pins.review(tool) !== 'approved').map((t) => t.name);
+    if (pending.length) {
+      this.ctx.logger.warn(
+        { slug: row.slug, tools: pending },
+        'upstream tool definitions changed; hidden until an admin approves them',
+      );
+    }
   }
 
   private async persistStatus(
@@ -184,24 +318,72 @@ export class UpstreamManager extends EventEmitter {
     }
   }
 
-  private async persistTools(serverId: string, tools: UpstreamTool[]): Promise<void> {
+  /** Stores the current definitions (keeping approvals) and drops tools the server no longer has. */
+  private async persistTools(
+    serverId: string,
+    tools: UpstreamTool[],
+    trustAll: boolean,
+  ): Promise<void> {
+    const now = this.ctx.now();
+    const excluded = (column: string) => sql.raw(`excluded.${column}`);
     try {
       await this.ctx.db.transaction(async (tx) => {
-        await tx.delete(upstreamTools).where(eq(upstreamTools.serverId, serverId));
-        if (tools.length === 0) return;
-        await tx.insert(upstreamTools).values(
-          tools.map((tool) => ({
-            serverId,
-            name: tool.name,
-            title: tool.title ?? null,
-            description: tool.description ?? null,
-            inputSchema: tool.inputSchema,
-            outputSchema: tool.outputSchema ?? null,
-            annotations: tool.annotations ?? null,
-            definitionHash: sha256(JSON.stringify(tool)),
-            fetchedAt: this.ctx.now(),
-          })),
-        );
+        const names = tools.map((tool) => tool.name);
+        await tx
+          .delete(upstreamTools)
+          .where(
+            names.length
+              ? and(eq(upstreamTools.serverId, serverId), notInArray(upstreamTools.name, names))
+              : eq(upstreamTools.serverId, serverId),
+          );
+        if (tools.length) {
+          await tx
+            .insert(upstreamTools)
+            .values(
+              tools.map((tool) => {
+                const hash = definitionHash(tool);
+                return {
+                  serverId,
+                  name: tool.name,
+                  title: tool.title ?? null,
+                  description: tool.description ?? null,
+                  inputSchema: tool.inputSchema,
+                  outputSchema: tool.outputSchema ?? null,
+                  annotations: tool.annotations ?? null,
+                  definitionHash: hash,
+                  ...(trustAll
+                    ? { approvedDefinition: tool, approvedHash: hash, approvedAt: now }
+                    : {}),
+                  fetchedAt: now,
+                };
+              }),
+            )
+            .onConflictDoUpdate({
+              target: [upstreamTools.serverId, upstreamTools.name],
+              set: {
+                title: excluded('title'),
+                description: excluded('description'),
+                inputSchema: excluded('input_schema'),
+                outputSchema: excluded('output_schema'),
+                annotations: excluded('annotations'),
+                definitionHash: excluded('definition_hash'),
+                fetchedAt: excluded('fetched_at'),
+                ...(trustAll
+                  ? {
+                      approvedDefinition: excluded('approved_definition'),
+                      approvedHash: excluded('approved_hash'),
+                      approvedAt: excluded('approved_at'),
+                    }
+                  : {}),
+              },
+            });
+        }
+        if (trustAll) {
+          await tx
+            .update(upstreamServers)
+            .set({ toolsPinnedAt: now })
+            .where(and(eq(upstreamServers.id, serverId), isNull(upstreamServers.toolsPinnedAt)));
+        }
       });
     } catch (error) {
       this.ctx.logger.error({ err: error }, 'failed to persist upstream tools');

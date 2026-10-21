@@ -656,6 +656,11 @@ tr:last-child td {
   overflow: auto;
 }
 
+.tool.pending {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+}
+
 .confirm-card {
   display: flex;
   flex-direction: column;

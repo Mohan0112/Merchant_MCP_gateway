@@ -1,6 +1,9 @@
 import type {
   ApiKey,
   AssistantSettings,
+  CreatePolicyRequest,
+  EffectiveTool,
+  Policy,
   AuditEntry,
   AuditQuery,
   CreateApiKeyRequest,
@@ -123,11 +126,24 @@ export const api = {
     request<{ server: Server }>('PATCH', `/api/servers/${id}`, input),
   deleteServer: (id: string) => request<void>('DELETE', `/api/servers/${id}`),
   refreshServer: (id: string) => request<{ server: Server }>('POST', `/api/servers/${id}/refresh`),
+  approveTools: (id: string, names?: string[]) =>
+    request<{ approved: number; server: Server; tools: ToolInfo[] }>(
+      'POST',
+      `/api/servers/${id}/tools/approve`,
+      names ? { names } : {},
+    ),
   testServer: (input: TestConnectionRequest) =>
     request<{ result: TestConnectionResult }>('POST', '/api/servers/test', input),
 
   audit: (filters: Partial<AuditQuery>) =>
     request<AuditPage>('GET', `/api/audit-logs${query({ ...filters })}`),
+
+  policies: () => request<{ policies: Policy[] }>('GET', '/api/policies'),
+  createPolicy: (input: CreatePolicyRequest) =>
+    request<{ policy: Policy }>('POST', '/api/policies', input),
+  deletePolicy: (id: string) => request<void>('DELETE', '/api/policies/' + id),
+  effectiveTools: (userId?: string) =>
+    request<{ tools: EffectiveTool[] }>('GET', '/api/policies/effective' + query({ userId })),
 
   assistantSettings: () =>
     request<{ settings: AssistantSettings }>('GET', '/api/settings/assistant'),

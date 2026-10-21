@@ -42,6 +42,12 @@ const ConfigSchema = z.object({
     .pipe(z.array(UpstreamSeedSchema)),
   /** Extra Host names accepted on /mcp (comma-separated); the public host and in-cluster names always are. */
   MCP_ALLOWED_HOSTS: z.string().default('').transform(csv),
+  /**
+   * Upstream host names that may resolve to cluster-internal addresses: the platform's own MCP
+   * servers (comma-separated, * matches part of one label). Every other upstream must be public.
+   * The seeded servers' hosts are always allowed.
+   */
+  UPSTREAM_PRIVATE_HOSTS: z.string().default('').transform(csv),
   /** Chat agent models, tried in order: Groq first, Gemini as fallback. An empty key skips that provider. */
   GROQ_API_KEY: z.string().default(''),
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
@@ -67,6 +73,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`Invalid configuration:\n- ${problems.join('\n- ')}`);
   }
   return parsed.data;
+}
+
+/** Host names an upstream URL may use although they resolve to internal addresses (SSRF guard). */
+export function upstreamPrivateHosts(
+  config: Pick<Config, 'UPSTREAM_PRIVATE_HOSTS' | 'SEED_UPSTREAMS'>,
+): string[] {
+  const seeded = config.SEED_UPSTREAMS.map((seed) => new URL(seed.url).hostname);
+  return [...new Set([...config.UPSTREAM_PRIVATE_HOSTS, ...seeded])];
 }
 
 /** Host names /mcp answers to: the public host, the in-cluster Service names, loopback, and extras. */

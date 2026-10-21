@@ -12,9 +12,13 @@ import { isSessionLive } from '../modules/auth/sessions';
 import { findUserById } from '../modules/auth/users';
 import type { ChatTokenStore } from '../modules/chat/tokens';
 import { verifyApiKey } from '../modules/keys/service';
-import { invokeTool, type InvokeDeps, type McpPrincipal } from './invoke';
+import type { ToolPolicies } from '../modules/policies/service';
+import type { InvokeDeps, McpPrincipal, ToolInvoker } from './invoke';
+import { policyTarget } from './policy-guard';
 
 export interface McpEndpointDeps extends InvokeDeps {
+  invoker: ToolInvoker;
+  policies: ToolPolicies;
   chatTokens: ChatTokenStore;
   /** Host names accepted on /mcp: the public host plus in-cluster names (DNS-rebinding protection). */
   allowedHosts: string[];
@@ -103,18 +107,25 @@ export function registerMcpEndpoint(
         { capabilities: { tools: { listChanged: true } }, instructions: INSTRUCTIONS },
       );
       // Upstream definitions and results were already validated by the SDK client that fetched them.
-      server.setRequestHandler('tools/list', async () => ({
-        tools: deps.catalog.list() as Tool[],
-      }));
+      // Only the tools this caller may use (Task 23); the rest don't exist as far as they can tell.
+      server.setRequestHandler('tools/list', async () => {
+        const permissions = await deps.policies.for(principal);
+        return {
+          tools: deps.catalog
+            .entries()
+            .filter((tool) => permissions.decide(policyTarget(tool)).allowed)
+            .map((tool) => tool.definition) as Tool[],
+        };
+      });
       server.setRequestHandler(
         'tools/call',
         async (request) =>
-          (await invokeTool(
-            deps,
-            { principal, requestId },
-            request.params.name,
-            (request.params.arguments ?? {}) as Record<string, unknown>,
-          )) as CallToolResult,
+          (await deps.invoker.invoke({
+            principal,
+            requestId,
+            name: request.params.name,
+            args: (request.params.arguments ?? {}) as Record<string, unknown>,
+          })) as CallToolResult,
       );
       return server;
     },

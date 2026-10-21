@@ -88,3 +88,11 @@ jobs:
           # layer without running it, and "pnpm install --offline" would find an empty store.
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=min,scope=${{ matrix.image }}
+      # Fails the build on a CRITICAL vulnerability that has a fix (Task 22). Unfixed ones are
+      # reported in the log but can't be acted on, so they don't block. The pinned Trivy image runs
+      # directly, like gitleaks in ci.yml, instead of a third-party action.
+      - name: Scan the image (Trivy)
+        run: >-
+          docker run --rm aquasec/trivy:0.75.0 image --no-progress
+          --severity CRITICAL --ignore-unfixed --exit-code 1
+          "${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.sha }}"

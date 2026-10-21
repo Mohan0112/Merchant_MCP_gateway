@@ -8,6 +8,20 @@
       "when": 1792065616912,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792610993842,
+      "tag": "0001_tool_pinning",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792612314703,
+      "tag": "0002_tool_policies",
+      "breakpoints": true
     }
   ]
 }

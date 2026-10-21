@@ -21,8 +21,55 @@ spec:
         - podSelector:
             matchLabels:
               {{- toYaml . | nindent 14 }}
+          {{- with $.Values.networkPolicy.gatewayNamespace }}
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+          {{- end }}
         {{- end }}
       ports:
         - port: http
           protocol: TCP
+{{- if .Values.global.networkPolicy.egress.enabled }}
+---
+# What this server may connect to besides DNS: only the pods and public ports in
+# networkPolicy.egress. Nothing listed means nothing.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mcp-server.name" . }}-egress
+  labels:
+    {{- include "mcp-server.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mcp-server.selectorLabels" . | nindent 6 }}
+  policyTypes: [Egress]
+  {{- with .Values.networkPolicy.egress }}
+  {{- if or .toPods .internetPorts }}
+  egress:
+    {{- range .toPods }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml .podLabels | nindent 14 }}
+      ports:
+        - port: {{ .port }}
+          protocol: TCP
+    {{- end }}
+    {{- with .internetPorts }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml $.Values.global.networkPolicy.egress.privateRanges | nindent 14 }}
+      ports:
+        {{- range . }}
+        - port: {{ . }}
+          protocol: TCP
+        {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+{{- end }}
 {{- end }}

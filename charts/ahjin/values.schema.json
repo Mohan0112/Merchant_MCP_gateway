@@ -6,23 +6,35 @@
     "podLabels": {
       "type": "object",
       "minProperties": 1,
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "allowFromPods": {
       "description": "Label sets of same-namespace pods allowed in; an empty list would admit every pod",
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/definitions/podLabels" }
+      "items": {
+        "$ref": "#/definitions/podLabels"
+      }
     },
     "mcpServer": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
+        "enabled": {
+          "type": "boolean"
+        },
         "image": {
           "type": "object",
           "properties": {
-            "repository": { "type": "string", "minLength": 1 },
-            "tag": { "type": "string", "minLength": 1 }
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "secretEnv": {
@@ -30,13 +42,59 @@
           "additionalProperties": {
             "type": "object",
             "required": ["secret", "key"],
-            "properties": { "secret": { "type": "string" }, "key": { "type": "string" } }
+            "properties": {
+              "secret": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              }
+            }
           }
         },
         "networkPolicy": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "allowFromPods": { "$ref": "#/definitions/allowFromPods" } }
+          "properties": {
+            "allowFromPods": {
+              "$ref": "#/definitions/allowFromPods"
+            },
+            "gatewayNamespace": {
+              "type": "string"
+            },
+            "egress": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "toPods": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["podLabels", "port"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "podLabels": {
+                        "$ref": "#/definitions/podLabels"
+                      },
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      }
+                    }
+                  }
+                },
+                "internetPorts": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -46,30 +104,83 @@
       "type": "object",
       "required": ["domain", "ingressClassName", "tls", "networkPolicy"],
       "properties": {
-        "domain": { "type": "string", "minLength": 3 },
-        "scheme": { "enum": ["http", "https"] },
-        "ingressClassName": { "type": "string" },
-        "logLevel": { "enum": ["trace", "debug", "info", "warn", "error"] },
+        "domain": {
+          "type": "string",
+          "minLength": 3
+        },
+        "scheme": {
+          "enum": ["http", "https"]
+        },
+        "ingressClassName": {
+          "type": "string"
+        },
+        "logLevel": {
+          "enum": ["trace", "debug", "info", "warn", "error"]
+        },
         "tls": {
           "type": "object",
           "required": ["enabled"],
           "properties": {
-            "enabled": { "type": "boolean" },
-            "clusterIssuer": { "type": "string" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "clusterIssuer": {
+              "type": "string"
+            }
           }
         },
         "networkPolicy": {
           "type": "object",
-          "required": ["enabled", "ingressController"],
+          "required": ["enabled", "ingressController", "egress"],
           "properties": {
-            "enabled": { "type": "boolean" },
+            "enabled": {
+              "type": "boolean"
+            },
             "ingressController": {
               "type": "object",
               "required": ["namespace", "podLabels"],
               "additionalProperties": false,
               "properties": {
-                "namespace": { "type": "string", "minLength": 1 },
-                "podLabels": { "$ref": "#/definitions/podLabels" }
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "podLabels": {
+                  "$ref": "#/definitions/podLabels"
+                }
+              }
+            },
+            "egress": {
+              "type": "object",
+              "required": ["enabled", "dns", "privateRanges"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "dns": {
+                  "type": "object",
+                  "required": ["namespace", "podLabels"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "namespace": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "podLabels": {
+                      "$ref": "#/definitions/podLabels"
+                    }
+                  }
+                },
+                "privateRanges": {
+                  "description": "Excluded from 'the internet' for pods allowed to reach it",
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[0-9.]+/[0-9]{1,2}$"
+                  }
+                }
               }
             }
           }
@@ -79,7 +190,9 @@
     "traefik": {
       "type": "object",
       "properties": {
-        "configureTimeouts": { "type": "boolean" }
+        "configureTimeouts": {
+          "type": "boolean"
+        }
       }
     },
     "certManager": {
@@ -90,41 +203,74 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
-            "name": { "type": "string", "minLength": 1 }
+            "enabled": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "letsEncrypt": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
-            "email": { "type": "string" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "email": {
+              "type": "string"
+            }
           }
         }
       }
     },
-    "woo-mcp": { "$ref": "#/definitions/mcpServer" },
-    "fx-mcp": { "$ref": "#/definitions/mcpServer" },
-    "platform": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+    "woo-mcp": {
+      "$ref": "#/definitions/mcpServer"
+    },
+    "fx-mcp": {
+      "$ref": "#/definitions/mcpServer"
+    },
+    "platform": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "store": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
+        "enabled": {
+          "type": "boolean"
+        },
         "wordpress": {
           "type": "object",
           "properties": {
             "image": {
               "type": "object",
               "properties": {
-                "repository": { "type": "string", "minLength": 1 },
-                "tag": { "type": "string", "minLength": 1 }
+                "repository": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tag": {
+                  "type": "string",
+                  "minLength": 1
+                }
               }
             },
             "networkPolicy": {
               "type": "object",
               "properties": {
-                "allowFromPods": { "type": "array", "items": { "$ref": "#/definitions/podLabels" } }
+                "allowFromPods": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/podLabels"
+                  }
+                }
               }
             }
           }

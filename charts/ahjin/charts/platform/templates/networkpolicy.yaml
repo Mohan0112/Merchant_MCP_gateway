@@ -50,3 +50,54 @@ spec:
           protocol: TCP
 {{- end }}
 {{- end }}
+{{- if and .Values.global.networkPolicy.enabled .Values.global.networkPolicy.egress.enabled }}
+---
+# Gateway egress: its PostgreSQL, the MCP servers (in this namespace and in the store and hosted
+# server namespaces, all labelled part-of=ahjin), and public HTTP(S) for hosted MCP servers and
+# the LLM APIs. Private ranges are excluded, so an admin-entered URL can't reach the node, the
+# Kubernetes API or cloud metadata even if it got past the gateway's own SSRF check.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-egress
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (list . "gateway") | nindent 6 }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "platform.selectorLabels" (list . "postgres") | nindent 14 }}
+      ports:
+        - port: 5432
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: mcp-server
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: ahjin
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: mcp-server
+      ports:
+        - port: 8080
+          protocol: TCP
+    {{- with .Values.gateway.networkPolicy.internetPorts }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml $.Values.global.networkPolicy.egress.privateRanges | nindent 14 }}
+      ports:
+        {{- range . }}
+        - port: {{ . }}
+          protocol: TCP
+        {{- end }}
+    {{- end }}
+{{- end }}

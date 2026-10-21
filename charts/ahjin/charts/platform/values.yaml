@@ -15,6 +15,10 @@ gateway:
     # What the chat assistant is told about the business until an admin edits it in the dashboard
     # (Assistant page). Rendered with tpl, so it may use values such as the store's URL.
     context: ''
+  networkPolicy:
+    # Public ports the gateway may reach: hosted MCP servers (GitHub) and the LLM APIs. Private
+    # ranges stay closed; in-cluster MCP servers are admitted by label instead.
+    internetPorts: [80, 443]
   # Requests follow `kubectl top` on the local cluster (about 165Mi idle with three upstreams).
   resources:
     requests: { cpu: 100m, memory: 192Mi }

@@ -1,5 +1,6 @@
 import type {
   ApiKey,
+  AssistantSettings,
   AuditEntry,
   AuditQuery,
   CreateApiKeyRequest,
@@ -127,4 +128,9 @@ export const api = {
 
   audit: (filters: Partial<AuditQuery>) =>
     request<AuditPage>('GET', `/api/audit-logs${query({ ...filters })}`),
+
+  assistantSettings: () =>
+    request<{ settings: AssistantSettings }>('GET', '/api/settings/assistant'),
+  saveAssistantSettings: (context: string) =>
+    request<{ settings: AssistantSettings }>('PUT', '/api/settings/assistant', { context }),
 };

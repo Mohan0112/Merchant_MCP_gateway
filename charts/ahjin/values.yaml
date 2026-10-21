@@ -79,6 +79,20 @@ fx-mcp:
 platform:
   enabled: true
   gateway:
+    chat:
+      # The chat assistant's knowledge of the shop. Facts only; live data comes from the tools.
+      context: |
+        Ahjin is an online laptop store in India.
+        - It sells laptops from Apple, Dell, Alienware, Lenovo, HP, ASUS, Acer and Microsoft, in six
+          categories: Gaming, Ultrabooks, Creators, Business, 2-in-1 and Everyday.
+        - Prices are in Indian rupees (INR, ₹) and have no decimals.
+        - Payment: cash on delivery only. There is no online payment.
+        - Delivery: free anywhere in India, in 3 to 5 days.
+        - Warranty: 1 year on every laptop, and a 7-day replacement for faulty units.
+        - Storefront: {{ .Values.global.scheme }}://store.{{ .Values.global.domain }}/shop/
+        - Order statuses: pending (awaiting payment), processing (to be shipped), on-hold,
+          completed, cancelled, refunded and failed. Cash-on-delivery orders start as processing.
+        - Tone: friendly and brief, like a helpful store manager.
     seedUpstreams:
       - slug: woo
         displayName: WooCommerce store

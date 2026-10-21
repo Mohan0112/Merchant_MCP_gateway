@@ -94,6 +94,34 @@ describe('WooRestClient', () => {
     expect(params.get('dates_are_gmt')).toBe('true');
   });
 
+  it('filters products by category slug or name, and explains an unknown category', async () => {
+    handler = (_req, url) =>
+      url.pathname.endsWith('/products/categories')
+        ? {
+            status: 200,
+            body: [
+              { id: 7, name: 'Gaming', slug: 'gaming', count: 4 },
+              { id: 1, name: 'Uncategorized', slug: 'uncategorized', count: 0 },
+            ],
+          }
+        : { status: 200, body: [product], headers: { 'x-wp-total': '1' } };
+    await client().listProducts({
+      page: 1,
+      per_page: 20,
+      category: 'Gaming',
+      stock_status: 'instock',
+    });
+    const products = seen.find((r) => r.url.pathname === '/wp-json/wc/v3/products')!;
+    expect(products.url.searchParams.get('category')).toBe('7');
+    expect(products.url.searchParams.get('stock_status')).toBe('instock');
+    await expect(
+      client().listProducts({ page: 1, per_page: 20, category: 'phones' }),
+    ).rejects.toMatchObject({
+      kind: 'invalid',
+      message: "there is no category 'phones'. Categories: gaming",
+    });
+  });
+
   it('strips HTML from product descriptions', async () => {
     handler = () => ({ status: 200, body: product });
     expect((await client().getProduct(10)).description).toBe('A sturdy mug .');

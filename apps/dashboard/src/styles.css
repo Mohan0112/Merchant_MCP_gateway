@@ -656,6 +656,36 @@ tr:last-child td {
   overflow: auto;
 }
 
+.confirm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--warning);
+  background: var(--warning-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+.confirm-card pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow: auto;
+}
+.guardrail-note {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.guardrails {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .composer {
   display: flex;
   gap: 8px;

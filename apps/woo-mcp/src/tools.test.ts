@@ -5,14 +5,23 @@ import {
   WooError,
   type CreateProductInput,
   type ListOrdersQuery,
+  type ListProductsQuery,
   type WooCommercePort,
 } from './woo/port';
 
 /** In-memory WooCommerce that records what the tools asked for. */
 function fakeWoo() {
-  const calls: { listOrders?: ListOrdersQuery; createProduct?: CreateProductInput } = {};
+  const calls: {
+    listOrders?: ListOrdersQuery;
+    listProducts?: ListProductsQuery;
+    createProduct?: CreateProductInput;
+  } = {};
   const woo: WooCommercePort = {
-    listProducts: async () => ({ items: [], total: 0, total_pages: 0 }),
+    listProducts: async (query) => {
+      calls.listProducts = query;
+      return { items: [], total: 0, total_pages: 0 };
+    },
+    listCategories: async () => [{ id: 5, name: 'Gaming', slug: 'gaming', count: 4 }],
     getProduct: async (id) => {
       throw new WooError('not_found', `no product ${id}`, 404);
     },
@@ -62,15 +71,25 @@ function setup(now = new Date('2026-10-15T06:00:00Z')) {
 }
 
 describe('woo-mcp tools', () => {
-  it('exposes the five required tools plus get_product', () => {
+  it('exposes the five required tools plus get_product and list_categories', () => {
     expect(Object.keys(setup().tools).sort()).toEqual([
       'create_product',
       'get_order',
       'get_product',
+      'list_categories',
       'list_orders',
       'list_products',
       'update_order_status',
     ]);
+  });
+
+  it('list_products passes the category and stock filters to the store', async () => {
+    const { run, calls } = setup();
+    await run('list_products', { category: 'gaming', stock_status: 'instock' });
+    expect(calls.listProducts).toMatchObject({ category: 'gaming', stock_status: 'instock' });
+    expect(await run('list_categories', {})).toEqual({
+      categories: [{ id: 5, name: 'Gaming', slug: 'gaming', count: 4 }],
+    });
   });
 
   it('list_orders period=today asks the store for the local day in the store timezone', async () => {

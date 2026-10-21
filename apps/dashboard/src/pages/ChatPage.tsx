@@ -18,10 +18,21 @@ interface ToolCall {
   preview?: string;
 }
 
+interface Confirmation {
+  name: string;
+  arguments: unknown;
+  note: string;
+  approval: string;
+  state: 'waiting' | 'approved' | 'cancelled';
+}
+
 interface Turn {
   role: 'user' | 'assistant';
   content: string;
   tools: ToolCall[];
+  confirmation?: Confirmation;
+  /** A guardrail stepped in (refused message, removed secrets). */
+  notice?: string;
   error?: string;
   pending?: boolean;
   meta?: string;
@@ -37,6 +48,7 @@ const SUGGESTIONS = [
 /** Sends one chat turn and applies each server-sent event as it arrives. */
 async function streamTurn(
   messages: ChatMessage[],
+  approval: string | undefined,
   signal: AbortSignal,
   onEvent: (event: ChatEvent) => void,
 ): Promise<void> {
@@ -44,7 +56,7 @@ async function streamTurn(
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, ...(approval ? { approval } : {}) }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -96,6 +108,47 @@ function ToolCallView({ call }: { call: ToolCall }) {
   );
 }
 
+/** A change the assistant wants to make; nothing runs until the user approves this exact call. */
+function ConfirmationView({
+  confirmation,
+  disabled,
+  onApprove,
+  onCancel,
+}: {
+  confirmation: Confirmation;
+  disabled: boolean;
+  onApprove: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="confirm-card">
+      <div className="row">
+        <strong>Approval needed</strong>
+        <span className="badge warning plain">changes data</span>
+      </div>
+      {confirmation.note ? <div>{confirmation.note}</div> : null}
+      <div className="muted small">
+        The assistant wants to run <code>{confirmation.name}</code> with:
+      </div>
+      <pre className="mono">{JSON.stringify(confirmation.arguments, null, 2)}</pre>
+      {confirmation.state === 'waiting' ? (
+        <div className="row">
+          <button className="btn primary" disabled={disabled} onClick={onApprove}>
+            Approve and run
+          </button>
+          <button className="btn" disabled={disabled} onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <div className="muted small">
+          {confirmation.state === 'approved' ? 'Approved.' : 'Cancelled. Nothing was changed.'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ChatPage() {
   const client = useQueryClient();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -113,27 +166,19 @@ export function ChatPage() {
   const updateLast = (change: (turn: Turn) => Turn) =>
     setTurns((current) => [...current.slice(0, -1), change(current.at(-1)!)]);
 
-  const send = async (text: string) => {
-    const question = text.trim();
-    if (!question || busy) return;
-    setError(null);
-    setInput('');
-    // The history the model sees: earlier questions and answers, without tool details or errors.
-    const history: ChatMessage[] = [
-      ...turns
-        .filter((t) => t.content && !t.error)
-        .map((t): ChatMessage => ({ role: t.role, content: t.content })),
-      { role: 'user' as const, content: question },
-    ].slice(-20);
-    setTurns((current) => [
-      ...current,
-      { role: 'user', content: question, tools: [] },
-      { role: 'assistant', content: '', tools: [], pending: true },
-    ]);
+  // The history the model sees: earlier questions and answers, without tool details or errors.
+  const historyOf = (list: Turn[]): ChatMessage[] =>
+    list
+      .filter((t) => t.content && !t.error)
+      .map((t): ChatMessage => ({ role: t.role, content: t.content }))
+      .slice(-20);
+
+  /** Streams one assistant turn into the last (pending) turn. */
+  const run = async (history: ChatMessage[], approval?: string) => {
     const controller = new AbortController();
     abort.current = controller;
     try {
-      await streamTurn(history, controller.signal, (event) => {
+      await streamTurn(history, approval, controller.signal, (event) => {
         switch (event.type) {
           case 'tool.started':
             updateLast((turn) => ({
@@ -165,6 +210,21 @@ export function ChatPage() {
               ),
             }));
             break;
+          case 'confirmation.required':
+            updateLast((turn) => ({
+              ...turn,
+              confirmation: {
+                name: event.name,
+                arguments: event.arguments,
+                note: event.note,
+                approval: event.approval,
+                state: 'waiting',
+              },
+            }));
+            break;
+          case 'guardrail':
+            updateLast((turn) => ({ ...turn, notice: event.message }));
+            break;
           case 'message':
             updateLast((turn) => ({ ...turn, content: event.text }));
             break;
@@ -191,6 +251,43 @@ export function ChatPage() {
       // Tool calls may have changed data shown elsewhere (new products, the audit log).
       void client.invalidateQueries({ queryKey: ['audit'] });
     }
+  };
+
+  const send = async (text: string) => {
+    const question = text.trim();
+    if (!question || busy) return;
+    setError(null);
+    setInput('');
+    const history = historyOf([...turns, { role: 'user', content: question, tools: [] }]);
+    setTurns((current) => [
+      ...current,
+      { role: 'user', content: question, tools: [] },
+      { role: 'assistant', content: '', tools: [], pending: true },
+    ]);
+    await run(history);
+  };
+
+  /** Approve runs exactly the proposed call; cancel just records that nothing was changed. */
+  const decide = async (index: number, approve: boolean) => {
+    const confirmation = turns[index]?.confirmation;
+    if (!confirmation || busy) return;
+    const decided = turns.map((turn, i): Turn =>
+      i === index
+        ? {
+            ...turn,
+            confirmation: { ...confirmation, state: approve ? 'approved' : 'cancelled' },
+            // A cancelled change stays in the history, so the model knows it didn't happen.
+            ...(approve ? {} : { content: 'Cancelled: I did not make that change.' }),
+          }
+        : turn,
+    );
+    if (!approve) {
+      setTurns(decided);
+      return;
+    }
+    setError(null);
+    setTurns([...decided, { role: 'assistant', content: '', tools: [], pending: true }]);
+    await run(historyOf(decided), confirmation.approval);
   };
 
   return (
@@ -230,6 +327,15 @@ export function ChatPage() {
                 {turn.tools.map((call) => (
                   <ToolCallView key={call.callId} call={call} />
                 ))}
+                {turn.notice ? <div className="guardrail-note">🛡️ {turn.notice}</div> : null}
+                {turn.confirmation ? (
+                  <ConfirmationView
+                    confirmation={turn.confirmation}
+                    disabled={busy}
+                    onApprove={() => void decide(index, true)}
+                    onCancel={() => void decide(index, false)}
+                  />
+                ) : null}
                 {turn.content || turn.error || turn.pending ? (
                   <div className="bubble">
                     {turn.content ? (

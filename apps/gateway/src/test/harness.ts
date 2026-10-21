@@ -110,7 +110,7 @@ export class Browser {
   }
 
   async request(
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: string,
     payload?: unknown,
   ): Promise<LightMyRequestResponse> {

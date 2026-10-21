@@ -7,6 +7,7 @@ import { RequireAdmin, RequireUser } from './auth';
 import { Spinner } from './components/ui';
 import { Layout } from './components/Layout';
 import { ApiError } from './lib/api';
+import { AssistantPage } from './pages/AssistantPage';
 import { AcceptInvitePage, ChangePasswordPage, LoginPage } from './pages/AuthPages';
 import { AuditPage } from './pages/AuditPage';
 import { KeysPage } from './pages/KeysPage';
@@ -60,6 +61,14 @@ const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <MembersPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/assistant',
+        element: (
+          <RequireAdmin>
+            <AssistantPage />
           </RequireAdmin>
         ),
       },

@@ -92,10 +92,12 @@ describe.skipIf(!databaseUrl)('MCP gateway', () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
+      'alpha__cancel_order',
       'alpha__echo',
       'alpha__fail',
       'alpha__server_info',
       'alpha__slow',
+      'beta__cancel_order',
       'beta__echo',
       'beta__fail',
       'beta__server_info',
@@ -264,7 +266,7 @@ describe.skipIf(!databaseUrl)('MCP gateway', () => {
     });
     expect(ok.json().result).toMatchObject({
       ok: true,
-      tools: ['echo', 'fail', 'slow', 'server_info'],
+      tools: ['echo', 'fail', 'slow', 'cancel_order', 'server_info'],
     });
     const bad = await team.admin.request('POST', '/api/servers/test', {
       url: `http://127.0.0.1:${await freePort()}/mcp`,

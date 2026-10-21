@@ -58,6 +58,7 @@ async function main() {
   const modules = createGatewayModules(ctx, {
     factory: sdkClientFactory,
     provider,
+    assistantContext: config.CHAT_CONTEXT,
     allowedHosts: mcpAllowedHosts(config),
     version: config.APP_VERSION,
     mcpUrl: () => `http://127.0.0.1:${config.PORT}/mcp`,

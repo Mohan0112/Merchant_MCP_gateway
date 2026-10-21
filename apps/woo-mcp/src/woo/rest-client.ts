@@ -13,6 +13,7 @@ import {
   type ListOrdersQuery,
   type ListProductsQuery,
   type OrderStatus,
+  type ProductCategory,
   type StoreSettings,
   type WooCommercePort,
 } from './port';
@@ -50,11 +51,14 @@ export class WooRestClient implements WooCommercePort {
   }
 
   async listProducts(query: ListProductsQuery) {
+    const category = query.category ? await this.categoryId(query.category) : undefined;
     const { data, headers } = await this.request<WooProduct[]>('GET', '/wc/v3/products', {
       query: {
         search: query.search,
         sku: query.sku,
         status: query.status,
+        category,
+        stock_status: query.stock_status,
         page: query.page,
         per_page: query.per_page,
       },
@@ -63,6 +67,31 @@ export class WooRestClient implements WooCommercePort {
       items: data.map((p) => toProductSummary(p, this.options.publicUrl)),
       ...totals(headers, data.length),
     };
+  }
+
+  async listCategories(): Promise<ProductCategory[]> {
+    const { data } = await this.request<Array<ProductCategory & { slug: string }>>(
+      'GET',
+      '/wc/v3/products/categories',
+      { query: { per_page: 100, hide_empty: 'true', orderby: 'name' } },
+    );
+    return data
+      .filter((c) => c.slug !== 'uncategorized')
+      .map((c) => ({ id: c.id, name: c.name, slug: c.slug, count: c.count }));
+  }
+
+  /** A category slug or name to its id; WooCommerce filters products by id only. */
+  private async categoryId(value: string): Promise<number> {
+    const wanted = value.trim().toLowerCase();
+    const categories = await this.listCategories();
+    const match = categories.find((c) => c.slug === wanted || c.name.toLowerCase() === wanted);
+    if (!match) {
+      throw new WooError(
+        'invalid',
+        `there is no category '${value}'. Categories: ${categories.map((c) => c.slug).join(', ')}`,
+      );
+    }
+    return match.id;
   }
 
   async getProduct(id: number) {

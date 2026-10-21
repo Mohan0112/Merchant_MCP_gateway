@@ -261,6 +261,8 @@ export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
 export const ChatRequestSchema = z.object({
   messages: z.array(ChatMessageSchema).min(1).max(40),
+  /** The signed approval of a change the assistant proposed (from a confirmation.required event). */
+  approval: z.string().min(1).max(16_384).optional(),
 });
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
@@ -275,6 +277,36 @@ export type ChatEvent =
       durationMs: number;
       preview: string;
     }
+  | {
+      /** The assistant wants to run a tool that changes data; the user approves or cancels it. */
+      type: 'confirmation.required';
+      callId: string;
+      name: string;
+      server: string;
+      arguments: unknown;
+      /** What the assistant said about the change, if anything. */
+      note: string;
+      /** Signed, single-use and short-lived; sent back as ChatRequest.approval to run the call. */
+      approval: string;
+    }
+  /** A guardrail stepped in: a message was refused, or secrets were removed from an answer. */
+  | { type: 'guardrail'; code: string; message: string }
   | { type: 'message'; text: string }
   | { type: 'error'; code: string; message: string }
   | { type: 'done'; iterations: number; toolCalls: number; provider: string | null };
+
+// ---------- Settings ----------
+
+/** What the chat assistant is told about the business (policies, catalogue, tone). Admin-editable. */
+export const AssistantSettingsSchema = z.object({
+  context: z.string(),
+  /** "default" until an admin saves their own text (an empty save restores the default). */
+  source: z.enum(['default', 'custom']),
+  updatedAt: z.string().nullable(),
+});
+export type AssistantSettings = z.infer<typeof AssistantSettingsSchema>;
+
+export const UpdateAssistantSettingsSchema = z.object({
+  context: z.string().trim().max(6000),
+});
+export type UpdateAssistantSettings = z.infer<typeof UpdateAssistantSettingsSchema>;

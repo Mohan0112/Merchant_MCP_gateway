@@ -49,6 +49,8 @@ const ConfigSchema = z.object({
   GEMINI_API_KEY: z.string().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_BASE_URL: z.url().default('https://generativelanguage.googleapis.com/v1beta/openai/'),
+  /** What the chat assistant is told about the business until an admin edits it in the dashboard. */
+  CHAT_CONTEXT: z.string().max(6000).default(''),
   APP_VERSION: z.string().default('0.1.0'),
   GIT_SHA: z.string().default('dev'),
 });

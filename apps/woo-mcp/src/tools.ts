@@ -1,7 +1,13 @@
 import { defineTool, ToolError, type ToolHandler } from '@ahjin/mcp-kit';
 import * as z from 'zod';
 import { formatLocal, PERIODS, resolvePeriod, type DateRange } from './period';
-import { ORDER_STATUSES, WooError, type StoreSettings, type WooCommercePort } from './woo/port';
+import {
+  ORDER_STATUSES,
+  STOCK_STATUSES,
+  WooError,
+  type StoreSettings,
+  type WooCommercePort,
+} from './woo/port';
 
 /** Turns a classified store failure into a message the caller (and the model) can act on. */
 function explain(error: unknown, what: string): never {
@@ -95,8 +101,17 @@ export function buildTools({
     name: 'list_products',
     title: 'List products',
     description:
-      'List store products, newest first. Filter by search text, SKU or status. Returns id, name, SKU, price, status, stock status and storefront link.',
+      'List store products, newest first. Filter by category (see list_categories), stock status, search text, SKU or status. Returns id, name, SKU, price, status, stock status and storefront link.',
     inputSchema: z.object({
+      category: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Category slug or name, e.g. "gaming"; list_categories shows them all'),
+      stock_status: z
+        .enum(STOCK_STATUSES)
+        .optional()
+        .describe('instock for products that can be ordered now'),
       search: z
         .string()
         .min(1)
@@ -124,6 +139,27 @@ export function buildTools({
         };
       } catch (error) {
         explain(error, 'Products');
+      }
+    },
+  });
+
+  const listCategories = defineTool({
+    name: 'list_categories',
+    title: 'List categories',
+    description:
+      'List the product categories with their slug and number of published products. Use a slug as the category filter of list_products.',
+    inputSchema: z.object({}),
+    outputSchema: z.object({
+      categories: z.array(
+        z.object({ id: z.number(), name: z.string(), slug: z.string(), count: z.number() }),
+      ),
+    }),
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    execute: async () => {
+      try {
+        return { categories: await woo.listCategories() };
+      } catch (error) {
+        explain(error, 'Categories');
       }
     },
   });
@@ -270,6 +306,7 @@ export function buildTools({
 
   return [
     listProducts,
+    listCategories,
     getProduct,
     createProduct,
     listOrders,

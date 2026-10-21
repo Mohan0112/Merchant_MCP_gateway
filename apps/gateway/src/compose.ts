@@ -9,10 +9,12 @@ import { UpstreamManager } from './mcp/upstream/manager';
 import { registerAuditRoutes } from './modules/audit/routes';
 import { registerAuthPlugin, registerAuthRoutes } from './modules/auth/routes';
 import type { LlmProvider } from './modules/chat/llm';
+import { ApprovalTokens } from './modules/chat/approvals';
 import { registerChatRoutes } from './modules/chat/routes';
 import { ChatTokenStore } from './modules/chat/tokens';
 import { registerKeyRoutes } from './modules/keys/routes';
 import { registerServerRoutes } from './modules/servers/routes';
+import { AssistantSettingsStore, registerSettingsRoutes } from './modules/settings/assistant';
 
 export interface GatewayModuleOptions {
   /** How upstream MCP connections are made: the SDK in production, the same SDK against in-process servers in tests. */
@@ -20,6 +22,8 @@ export interface GatewayModuleOptions {
   connection?: ConnectionOptions;
   /** null when no LLM key is configured. */
   provider: LlmProvider | null;
+  /** What the assistant is told about the business until an admin edits it (Helm value). */
+  assistantContext?: string;
   allowedHosts: string[];
   version: string;
   /** Loopback URL of this process's /mcp endpoint, for the chat agent. */
@@ -47,6 +51,8 @@ export function createGatewayModules(
   const manager = new UpstreamManager(ctx, options.factory, options.connection);
   const catalog = new ToolCatalog(manager);
   const chatTokens = new ChatTokenStore(ctx.now);
+  const approvals = new ApprovalTokens(ctx.settings.apiKeyPepper, ctx.now);
+  const assistant = new AssistantSettingsStore(ctx, options.assistantContext ?? '');
   let endpoint: { close(): Promise<void> } | undefined;
 
   return {
@@ -59,9 +65,12 @@ export function createGatewayModules(
       registerKeyRoutes(app, ctx);
       registerServerRoutes(app, { ctx, manager, factory: options.factory });
       registerAuditRoutes(app, ctx);
+      registerSettingsRoutes(app, assistant);
       registerChatRoutes(app, {
         ctx,
         chatTokens,
+        approvals,
+        assistant,
         provider: options.provider,
         mcpUrl: options.mcpUrl,
       });

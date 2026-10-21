@@ -39,6 +39,12 @@ const ICONS = {
       <path d="M3 6h.01M3 12h.01M3 18h.01" />
     </>,
   ),
+  assistant: icon(
+    <>
+      <path d="M12 3 4 6v6c0 4.4 3.4 8.3 8 9 4.6-.7 8-4.6 8-9V6l-8-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </>,
+  ),
   members: icon(
     <>
       <circle cx="9" cy="8" r="4" />
@@ -87,6 +93,9 @@ export function Layout() {
             <div className="nav-section">Admin</div>
             <NavLink to="/members" className={link}>
               {ICONS.members} Members
+            </NavLink>
+            <NavLink to="/assistant" className={link}>
+              {ICONS.assistant} Assistant
             </NavLink>
           </>
         ) : null}

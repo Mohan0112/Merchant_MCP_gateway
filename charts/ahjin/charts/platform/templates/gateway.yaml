@@ -99,6 +99,10 @@ spec:
             - name: GEMINI_MODEL
               value: {{ .geminiModel | quote }}
             {{- end }}
+            {{- with .Values.gateway.chat.context }}
+            - name: CHAT_CONTEXT
+              value: {{ tpl . $ | quote }}
+            {{- end }}
             - name: LOG_LEVEL
               value: {{ .Values.global.logLevel | quote }}
             - name: APP_VERSION

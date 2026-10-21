@@ -72,13 +72,26 @@ export interface Page<T> {
 }
 
 export type ProductStatus = 'publish' | 'draft' | 'pending' | 'private' | 'any';
+export const STOCK_STATUSES = ['instock', 'outofstock', 'onbackorder'] as const;
+export type StockStatus = (typeof STOCK_STATUSES)[number];
 
 export interface ListProductsQuery {
   search?: string;
   sku?: string;
   status?: ProductStatus;
+  /** Category slug or name, e.g. "gaming" or "Gaming". */
+  category?: string;
+  stock_status?: StockStatus;
   page: number;
   per_page: number;
+}
+
+export interface ProductCategory {
+  id: number;
+  name: string;
+  slug: string;
+  /** Published products in the category. */
+  count: number;
 }
 
 export interface CreateProductInput {
@@ -113,6 +126,7 @@ export interface ListOrdersQuery {
 
 export interface WooCommercePort {
   listProducts(query: ListProductsQuery): Promise<Page<ProductSummary>>;
+  listCategories(): Promise<ProductCategory[]>;
   getProduct(id: number): Promise<ProductDetail>;
   createProduct(input: CreateProductInput): Promise<ProductSummary>;
   listOrders(query: ListOrdersQuery): Promise<Page<OrderSummary>>;

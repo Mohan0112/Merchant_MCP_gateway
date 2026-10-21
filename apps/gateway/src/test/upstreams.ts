@@ -24,6 +24,7 @@ const fail = defineTool({
   name: 'fail',
   description: 'Always fails with a readable error.',
   inputSchema: z.object({}),
+  annotations: { readOnlyHint: true },
   execute: async () => {
     throw new ToolError('Order 999 not found');
   },
@@ -33,10 +34,21 @@ const slow = defineTool({
   name: 'slow',
   description: 'Answers after the given delay.',
   inputSchema: z.object({ ms: z.number().int() }),
+  annotations: { readOnlyHint: true },
   execute: async ({ ms }) => {
     await new Promise((resolve) => setTimeout(resolve, ms));
     return { waited: ms };
   },
+});
+
+/** A change that can't be undone: the chat agent asks the user before running it. */
+const cancelOrder = defineTool({
+  name: 'cancel_order',
+  description: 'Cancels an order.',
+  inputSchema: z.object({ id: z.number().int() }),
+  outputSchema: z.object({ id: z.number(), status: z.string() }),
+  annotations: { readOnlyHint: false, destructiveHint: true },
+  execute: async ({ id }) => ({ id, status: 'cancelled' }),
 });
 
 export interface TestUpstream {
@@ -54,7 +66,7 @@ export async function startUpstream(
   const server = createMcpHttpServer({
     name,
     version: '1.0.0',
-    tools: [echo, fail, slow],
+    tools: [echo, fail, slow, cancelOrder],
     credential,
     allowedHosts: ['127.0.0.1', 'localhost'],
     logger: quietLogger,

@@ -25,6 +25,7 @@ describe.skipIf(!url)('database migrations', () => {
       'invitations',
       'sessions',
       'system_settings',
+      'tool_policies',
       'upstream_servers',
       'upstream_tools',
       'users',

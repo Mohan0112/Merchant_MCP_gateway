@@ -1,0 +1,128 @@
+{{- /*
+Store backups (Task 28): a gzipped mariadb-dump of the WordPress database into the store-backups
+volume, nightly and right before every helm upgrade. The newest backup.keep files are kept.
+Restore: scripts/backup.mjs restore --component=store (docs/runbooks/backup-and-restore.md).
+*/}}
+{{- define "store.backupPod" -}}
+metadata:
+  labels:
+    {{- include "store.labels" (list . "store-backup") | nindent 4 }}
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  # Next to the database: its volume and the backup volume live on that node (local storage).
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              {{- include "store.selectorLabels" (list . "mariadb") | nindent 14 }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    seccompProfile: { type: RuntimeDefault }
+  containers:
+    - name: dump
+      image: "{{ .Values.mariadb.image.repository }}:{{ .Values.mariadb.image.tag }}"
+      command: [sh, -c]
+      args:
+        - |
+          set -eu
+          mkdir -p /backups/mariadb
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          out="/backups/mariadb/$stamp.sql.gz"
+          # The database may have just restarted; give it a moment before failing.
+          for i in 1 2 3 4 5 6; do mariadb-admin --host=mariadb --user="$MARIADB_USER" ping >/dev/null 2>&1 && break; sleep 5; done
+          mariadb-dump --host=mariadb --user="$MARIADB_USER" --single-transaction --triggers \
+            --databases "$MARIADB_DATABASE" | gzip > "$out.part"
+          mv "$out.part" "$out"
+          ls -1t /backups/mariadb/*.sql.gz | tail -n +$((KEEP + 1)) | xargs -r rm -f
+          echo "backup $out $(du -h "$out" | cut -f1); kept $(ls -1 /backups/mariadb/*.sql.gz | wc -l)"
+      env:
+        - name: MARIADB_USER
+          value: {{ .Values.mariadb.user | quote }}
+        - name: MARIADB_DATABASE
+          value: {{ .Values.mariadb.database | quote }}
+        # Read by the MariaDB client tools, so the password never appears in a command line.
+        - name: MYSQL_PWD
+          valueFrom:
+            secretKeyRef: { name: {{ .Values.secrets.db }}, key: password }
+        - name: KEEP
+          value: {{ .Values.backup.keep | quote }}
+      resources:
+        requests: { cpu: 50m, memory: 64Mi }
+        limits: { cpu: 500m, memory: 256Mi }
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: { drop: [ALL] }
+      volumeMounts:
+        - { name: backups, mountPath: /backups }
+        - { name: tmp, mountPath: /tmp }
+  volumes:
+    - name: backups
+      persistentVolumeClaim: { claimName: store-backups }
+    - name: tmp
+      emptyDir: { sizeLimit: 64Mi }
+{{- end }}
+{{- if .Values.backup.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: store-backups
+  labels:
+    {{- include "store.labels" (list . "store-backup") | nindent 4 }}
+  annotations:
+    # Uninstalling the release must not delete the backups.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.backup.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.persistence.size }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: store-backup
+  labels:
+    {{- include "store.labels" (list . "store-backup") | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  timeZone: {{ .Values.backup.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      ttlSecondsAfterFinished: 86400
+      template:
+        {{- include "store.backupPod" . | nindent 8 }}
+{{- /* Only once the volume exists: on the upgrade that introduces it, there is nothing to back up into yet. */}}
+{{- if and .Values.backup.beforeUpgrade (lookup "v1" "PersistentVolumeClaim" .Release.Namespace "store-backups") }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: store-backup-pre-upgrade
+  labels:
+    {{- include "store.labels" (list . "store-backup") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  template:
+    {{- include "store.backupPod" . | nindent 4 }}
+{{- end }}
+{{- end }}

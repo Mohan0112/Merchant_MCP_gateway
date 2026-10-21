@@ -1,6 +1,6 @@
 name: images
 
-# Builds the five images on every push to main and pushes them to GHCR, tagged with the full git
+# Builds the six images on every push to main and pushes them to GHCR, tagged with the full git
 # SHA (immutable; values-prod.yaml pins it) and "main" (moves to the latest build of main).
 # Pull requests build nothing here: ci.yml gates them.
 on:
@@ -51,6 +51,9 @@ jobs:
           - image: dashboard
             context: .
             file: docker/dashboard/Dockerfile
+          - image: store-operator
+            context: .
+            file: docker/store-operator/Dockerfile
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4

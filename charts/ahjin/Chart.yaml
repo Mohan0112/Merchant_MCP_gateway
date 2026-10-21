@@ -2,8 +2,8 @@ apiVersion: v2
 name: ahjin
 description: WooCommerce store, MCP servers, team MCP gateway and dashboard in one release
 type: application
-version: 0.6.0
-appVersion: '0.4.0'
+version: 0.7.0
+appVersion: '0.5.0'
 # Local sub-charts live in charts/. The generic mcp-server chart is used once per MCP server
 # through an alias; the alias becomes the resource name.
 dependencies:
@@ -21,3 +21,9 @@ dependencies:
   - name: platform
     version: 0.1.0
     condition: platform.enabled
+  - name: observability
+    version: 0.1.0
+    condition: observability.enabled
+  - name: stores
+    version: 0.1.0
+    condition: global.stores.enabled

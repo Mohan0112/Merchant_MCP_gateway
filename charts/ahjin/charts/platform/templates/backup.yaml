@@ -1,0 +1,116 @@
+{{- /*
+Platform backups (Task 28): a gzipped pg_dump of the gateway database (users, keys, servers,
+encrypted credentials, permissions, audit log) into the platform-backups volume, nightly and right
+before every helm upgrade. The dump is plain SQL with --clean, so restoring replaces the schema.
+Restore: scripts/backup.mjs restore --component=platform (docs/runbooks/backup-and-restore.md).
+*/}}
+{{- define "platform.backupPod" -}}
+metadata:
+  labels:
+    {{- include "platform.labels" (list . "platform-backup") | nindent 4 }}
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  # Next to the database: its volume and the backup volume live on that node (local storage).
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              {{- include "platform.selectorLabels" (list . "postgres") | nindent 14 }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 70
+    runAsGroup: 70
+    fsGroup: 70
+    seccompProfile: { type: RuntimeDefault }
+  containers:
+    - name: dump
+      image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+      command: [sh, -c]
+      args:
+        - |
+          set -eu
+          mkdir -p /backups/postgres
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          out="/backups/postgres/$stamp.sql.gz"
+          for i in 1 2 3 4 5 6; do pg_isready --host=postgres --quiet && break; sleep 5; done
+          pg_dump --host=postgres --clean --if-exists --no-owner --no-privileges | gzip > "$out.part"
+          mv "$out.part" "$out"
+          ls -1t /backups/postgres/*.sql.gz | tail -n +$((KEEP + 1)) | xargs -r rm -f
+          echo "backup $out $(du -h "$out" | cut -f1); kept $(ls -1 /backups/postgres/*.sql.gz | wc -l)"
+      env:
+        {{- include "platform.databaseEnv" . | nindent 8 }}
+        - name: KEEP
+          value: {{ .Values.backup.keep | quote }}
+      resources:
+        requests: { cpu: 50m, memory: 64Mi }
+        limits: { cpu: 500m, memory: 256Mi }
+      securityContext:
+        {{- include "platform.containerSecurityContext" . | nindent 8 }}
+      volumeMounts:
+        - { name: backups, mountPath: /backups }
+        - { name: tmp, mountPath: /tmp }
+  volumes:
+    - name: backups
+      persistentVolumeClaim: { claimName: platform-backups }
+    - name: tmp
+      emptyDir: { sizeLimit: 64Mi }
+{{- end }}
+{{- if .Values.backup.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: platform-backups
+  labels:
+    {{- include "platform.labels" (list . "platform-backup") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.backup.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.persistence.size }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: platform-backup
+  labels:
+    {{- include "platform.labels" (list . "platform-backup") | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  timeZone: {{ .Values.backup.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      ttlSecondsAfterFinished: 86400
+      template:
+        {{- include "platform.backupPod" . | nindent 8 }}
+{{- if and .Values.backup.beforeUpgrade (lookup "v1" "PersistentVolumeClaim" .Release.Namespace "platform-backups") }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: platform-backup-pre-upgrade
+  labels:
+    {{- include "platform.labels" (list . "platform-backup") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  template:
+    {{- include "platform.backupPod" . | nindent 4 }}
+{{- end }}
+{{- end }}

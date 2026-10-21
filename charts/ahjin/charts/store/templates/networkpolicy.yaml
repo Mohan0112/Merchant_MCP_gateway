@@ -1,7 +1,7 @@
 {{- if .Values.global.networkPolicy.enabled }}
 {{- $ic := .Values.global.networkPolicy.ingressController }}
-# MariaDB: only the store's own pods, which all run WordPress code: the web pod, the bootstrap Job
-# and the wp-cron CronJob. Nothing else in the cluster needs the database.
+# MariaDB: only the store's own pods: the web pod, the bootstrap Job and the wp-cron CronJob (all
+# WordPress code), and the backup job. Nothing else in the cluster needs the database.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -15,7 +15,7 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        {{- range list "wordpress" "store-bootstrap" "wp-cron" }}
+        {{- range list "wordpress" "store-bootstrap" "wp-cron" "store-backup" }}
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: {{ . }}
@@ -56,7 +56,7 @@ spec:
 {{- end }}
 {{- if and .Values.global.networkPolicy.enabled .Values.global.networkPolicy.egress.enabled }}
 ---
-# Egress of the pods that run WordPress code (web, bootstrap Job, wp-cron): MariaDB only. WordPress
+# Egress of the pods that use the database (web, bootstrap Job, wp-cron, backups): MariaDB only. WordPress
 # itself is also told not to make outbound HTTP calls (WP_HTTP_BLOCK_EXTERNAL), so update checks
 # and marketplace widgets fail at once instead of waiting for a dropped connection.
 apiVersion: networking.k8s.io/v1
@@ -70,7 +70,7 @@ spec:
     matchExpressions:
       - key: app.kubernetes.io/name
         operator: In
-        values: [wordpress, store-bootstrap, wp-cron]
+        values: [wordpress, store-bootstrap, wp-cron, store-backup]
   policyTypes: [Egress]
   egress:
     - to:

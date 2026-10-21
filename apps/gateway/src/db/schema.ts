@@ -119,6 +119,8 @@ export const upstreamServers = pgTable('upstream_servers', {
   credentialTag: bytea('credential_tag'),
   timeoutMs: integer('timeout_ms').notNull().default(30_000),
   seeded: boolean('seeded').notNull().default(false),
+  /** Set when a platform component owns the registration (store-operator): not editable by hand. */
+  managedBy: text('managed_by'),
   lastStatus: text('last_status'),
   lastError: text('last_error'),
   lastCheckedAt: at('last_checked_at'),

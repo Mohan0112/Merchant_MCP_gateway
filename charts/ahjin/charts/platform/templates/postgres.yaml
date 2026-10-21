@@ -56,6 +56,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            {{- if .Values.backup.enabled }}
+            # Read-only, and only so the backup volume binds on this node: local-path volumes bind
+            # on first use, and the backup jobs then run next to the data they protect.
+            - name: backups
+              mountPath: /backups
+              readOnly: true
+            {{- end }}
           startupProbe:
             exec:
               command: [pg_isready, -U, {{ .Values.postgres.user | quote }}, -d, {{ .Values.postgres.database | quote }}]
@@ -79,6 +86,11 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
             seccompProfile: { type: RuntimeDefault }
+      {{- if .Values.backup.enabled }}
+      volumes:
+        - name: backups
+          persistentVolumeClaim: { claimName: platform-backups, readOnly: true }
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data

@@ -1,0 +1,28 @@
+# Metrics for operators (Task 24). The gateway serves Prometheus metrics on /metrics (internal
+# only); this chart scrapes every replica through DNS (no Kubernetes API access, so no RBAC).
+
+prometheus:
+  image:
+    repository: prom/prometheus
+    tag: v3.15.0
+    pullPolicy: IfNotPresent
+  scrapeInterval: 10s
+  # Metrics are kept in an emptyDir: they're operational data, rebuilt after a restart.
+  retention: 2d
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 500m, memory: 384Mi }
+
+grafana:
+  enabled: true
+  image:
+    repository: grafana/grafana
+    tag: 13.2.2
+    pullPolicy: IfNotPresent
+  # Secret with keys user and password (scripts/secrets.mjs creates grafana-admin).
+  adminSecret: grafana-admin
+  ingress:
+    enabled: true
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: '1', memory: 384Mi }

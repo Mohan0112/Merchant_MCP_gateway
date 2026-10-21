@@ -44,10 +44,25 @@ export interface CallGuard {
   check(call: CallRequest, tool: CatalogTool): Promise<Rejection | null> | Rejection | null;
 }
 
+/** One finished tool call, for metrics. */
+export interface ObservedCall {
+  server: string | null;
+  tool: string | null;
+  channel: AuditChannel;
+  outcome: AuditOutcome;
+  durationMs: number | null;
+}
+
+/** Told about every finished call (the gateway's metrics). */
+export interface CallObserver {
+  recordCall(call: ObservedCall): void;
+}
+
 export interface InvokeDeps {
   ctx: GatewayContext;
   catalog: ToolCatalog;
   manager: UpstreamManager;
+  observer?: CallObserver;
 }
 
 const errorResult = (text: string): CallToolResult => ({
@@ -70,6 +85,7 @@ class CallAudit {
     private readonly ctx: GatewayContext,
     private readonly call: CallRequest,
     private readonly tool: CatalogTool | undefined,
+    private readonly observer?: CallObserver,
   ) {
     this.slug = tool?.slug ?? slugOf(call.name);
   }
@@ -80,6 +96,14 @@ class CallAudit {
   }
 
   write(outcome: AuditOutcome, extra: Partial<AuditRecord> = {}): Promise<void> {
+    const durationMs = Date.now() - this.started;
+    this.observer?.recordCall({
+      server: this.slug,
+      tool: this.toolName,
+      channel: this.call.principal.channel,
+      outcome,
+      durationMs,
+    });
     return recordAudit(this.ctx, {
       userId: this.call.principal.userId,
       apiKeyId: this.call.principal.apiKeyId,
@@ -87,7 +111,7 @@ class CallAudit {
       serverId: this.tool?.serverId ?? null,
       serverSlug: this.slug,
       toolName: this.toolName,
-      durationMs: Date.now() - this.started,
+      durationMs,
       outcome,
       requestId: this.call.requestId,
       ...extra,
@@ -108,7 +132,7 @@ export class ToolInvoker {
 
   async invoke(call: CallRequest): Promise<CallToolResult> {
     const tool = this.deps.catalog.resolve(call.name);
-    const audit = new CallAudit(this.deps.ctx, call, tool);
+    const audit = new CallAudit(this.deps.ctx, call, tool, this.deps.observer);
     if (!tool) return this.unavailable(audit, call.name);
 
     for (const guard of this.guards) {

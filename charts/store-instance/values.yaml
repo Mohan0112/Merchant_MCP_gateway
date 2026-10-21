@@ -1,0 +1,90 @@
+# Defaults for one provisioned store. The store-operator adds the platform's global settings and
+# images (its ConfigMap, from the umbrella chart's values) and the store's own name and host.
+
+global:
+  domain: example.com
+  scheme: http
+  ingressClassName: traefik
+  logLevel: info
+  tls:
+    enabled: false
+    clusterIssuer: ''
+  networkPolicy:
+    enabled: true
+    ingressController:
+      namespace: kube-system
+      podLabels:
+        app.kubernetes.io/name: traefik
+    egress:
+      enabled: true
+      dns:
+        namespace: kube-system
+        podLabels:
+          k8s-app: kube-dns
+      privateRanges:
+        - 10.0.0.0/8
+        - 100.64.0.0/10
+        - 127.0.0.0/8
+        - 169.254.0.0/16
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+
+# Guardrails: what one store may use at most (ResourceQuota), and defaults for anything that
+# forgets to say (LimitRange). Sized for WordPress, MariaDB, woo-mcp, wp-cron and the bootstrap Job
+# running at once, with headroom for a rolling update.
+quota:
+  requests.cpu: '1'
+  requests.memory: 1536Mi
+  limits.cpu: '5'
+  limits.memory: 3Gi
+  pods: '12'
+  persistentvolumeclaims: '4'
+  requests.storage: 6Gi
+  services: '6'
+  secrets: '30'
+  configmaps: '10'
+limitRange:
+  default: { cpu: 500m, memory: 256Mi }
+  defaultRequest: { cpu: 50m, memory: 64Mi }
+  max: { cpu: '1', memory: 1Gi }
+
+store:
+  wordpress:
+    persistence:
+      size: 1Gi
+  mariadb:
+    persistence:
+      size: 1Gi
+  settings:
+    name: Store
+  ingress:
+    enabled: true
+    host: ''
+  # Kept small: a demo store's data is recreated by the bootstrap. Turn on for real tenants.
+  backup:
+    enabled: false
+
+woo-mcp:
+  enabled: true
+  image:
+    repository: ahjin-registry:5000/ahjin-woo-mcp
+    tag: dev
+  env:
+    WOO_BASE_URL: http://wordpress:8080
+    STORE_PUBLIC_URL: ''
+  secretEnv:
+    WOO_MCP_TOKEN: { secret: woo-mcp-auth, key: token }
+    WOO_CONSUMER_KEY: { secret: store-woo-api, key: consumer-key }
+    WOO_CONSUMER_SECRET: { secret: store-woo-api, key: consumer-secret }
+  networkPolicy:
+    # The gateway, in the platform namespace, is the only client.
+    allowFromPods:
+      - app.kubernetes.io/name: gateway
+    gatewayNamespace: ahjin
+    egress:
+      toPods:
+        - podLabels: { app.kubernetes.io/name: wordpress }
+          port: 8080
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 192Mi }

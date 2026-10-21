@@ -2,7 +2,9 @@ import type {
   ApiKey,
   AssistantSettings,
   CreatePolicyRequest,
+  CreateStoreRequest,
   EffectiveTool,
+  Insights,
   Policy,
   AuditEntry,
   AuditQuery,
@@ -12,6 +14,7 @@ import type {
   Invitation,
   Role,
   Server,
+  Store,
   TestConnectionRequest,
   TestConnectionResult,
   ToolInfo,
@@ -137,6 +140,14 @@ export const api = {
 
   audit: (filters: Partial<AuditQuery>) =>
     request<AuditPage>('GET', `/api/audit-logs${query({ ...filters })}`),
+
+  stores: () => request<{ enabled: boolean; stores: Store[] }>('GET', '/api/stores'),
+  createStore: (input: CreateStoreRequest) =>
+    request<{ store: Store }>('POST', '/api/stores', input),
+  deleteStore: (slug: string) => request<void>('DELETE', '/api/stores/' + slug),
+  retryStore: (slug: string) => request<{ store: Store }>('POST', '/api/stores/' + slug + '/retry'),
+
+  insights: (hours: number) => request<Insights>('GET', '/api/insights' + query({ hours })),
 
   policies: () => request<{ policies: Policy[] }>('GET', '/api/policies'),
   createPolicy: (input: CreatePolicyRequest) =>

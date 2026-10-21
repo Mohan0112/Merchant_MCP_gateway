@@ -1,0 +1,25 @@
+# Build context of docker/store-operator/Dockerfile (repository root): like the root .dockerignore,
+# plus the store-instance chart and the two platform sub-charts it reuses.
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.git
+.github
+.env
+.env.*
+!.env.example
+docs
+deploy
+docker/wordpress
+*.log
+charts/*
+!charts/store-instance
+charts/store-instance/charts
+charts/store-instance/Chart.lock
+!charts/ahjin
+charts/ahjin/*
+!charts/ahjin/charts
+charts/ahjin/charts/*
+!charts/ahjin/charts/store
+!charts/ahjin/charts/mcp-server

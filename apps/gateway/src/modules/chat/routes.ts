@@ -19,7 +19,11 @@ export interface ChatDeps {
   provider: LlmProvider | null;
   /** Loopback URL of this gateway's /mcp endpoint. */
   mcpUrl: () => string;
+  /** Told how each turn ended (metrics). */
+  onTurn?: (result: ChatTurnResult) => void;
 }
+
+export type ChatTurnResult = 'answered' | 'refused' | 'approval' | 'error';
 
 /**
  * POST /api/chat streams one chat turn as server-sent events. The chat module calls tools through
@@ -40,8 +44,15 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatDeps) {
       'X-Accel-Buffering': 'no',
       'X-Request-Id': request.id,
     });
-    const emit = (event: ChatEvent) =>
+    // How the turn ended, for metrics: the last decisive event wins.
+    let result: ChatTurnResult = 'answered';
+    const emit = (event: ChatEvent) => {
+      if (event.type === 'guardrail' && event.code === 'refused') result = 'refused';
+      else if (event.type === 'confirmation.required') result = 'approval';
+      else if (event.type === 'error') result = 'error';
+      else if (event.type === 'done') deps.onTurn?.(result);
       res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+    };
     const end = (event?: ChatEvent) => {
       if (event) emit(event);
       emit({ type: 'done', iterations: 0, toolCalls: 0, provider: null });

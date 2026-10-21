@@ -20,6 +20,8 @@ export interface McpEndpointDeps extends InvokeDeps {
   invoker: ToolInvoker;
   policies: ToolPolicies;
   chatTokens: ChatTokenStore;
+  /** Counts refused requests (metrics). */
+  onAuthDenied?: (reason: string) => void;
   /** Host names accepted on /mcp: the public host plus in-cluster names (DNS-rebinding protection). */
   allowedHosts: string[];
   version: string;
@@ -143,6 +145,7 @@ export function registerMcpEndpoint(
     handler: async (request, reply) => {
       const auth = await authenticate(deps, request.headers.authorization);
       if (!auth.ok) {
+        deps.onAuthDenied?.(auth.description.toLowerCase());
         // A denied call is audited when we know whose key it was (e.g. a revoked key).
         if (auth.userId) {
           await recordAudit(deps.ctx, {

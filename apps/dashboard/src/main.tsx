@@ -10,10 +10,12 @@ import { ApiError } from './lib/api';
 import { AssistantPage } from './pages/AssistantPage';
 import { AcceptInvitePage, ChangePasswordPage, LoginPage } from './pages/AuthPages';
 import { AuditPage } from './pages/AuditPage';
+import { InsightsPage } from './pages/InsightsPage';
 import { KeysPage } from './pages/KeysPage';
 import { MembersPage } from './pages/MembersPage';
 import { PermissionsPage } from './pages/PermissionsPage';
 import { ServersPage } from './pages/ServersPage';
+import { StoresPage } from './pages/StoresPage';
 import './styles.css';
 
 // The chat page brings the Markdown renderer; load it only when someone opens the chat.
@@ -56,7 +58,9 @@ const router = createBrowserRouter([
         ),
       },
       { path: '/keys', element: <KeysPage /> },
+      { path: '/stores', element: <StoresPage /> },
       { path: '/audit', element: <AuditPage /> },
+      { path: '/insights', element: <InsightsPage /> },
       {
         path: '/members',
         element: (

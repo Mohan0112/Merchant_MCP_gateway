@@ -15,9 +15,9 @@ app.kubernetes.io/name: {{ index . 1 }}
 app.kubernetes.io/instance: {{ $root.Release.Name }}
 {{- end -}}
 
-{{/* Public storefront host, e.g. store.127.0.0.1.nip.io */}}
+{{/* Public storefront host: store.<domain> (e.g. store.127.0.0.1.nip.io), or ingress.host for a provisioned store */}}
 {{- define "store.host" -}}
-{{- printf "store.%s" .Values.global.domain -}}
+{{- default (printf "store.%s" .Values.global.domain) .Values.ingress.host -}}
 {{- end -}}
 
 {{/* Public storefront URL used for WP_HOME / WP_SITEURL (global.scheme: http locally, https in prod) */}}

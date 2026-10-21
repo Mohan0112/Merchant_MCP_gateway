@@ -1,0 +1,64 @@
+# The Store custom resource (Task 30). Kept on uninstall: deleting the definition would delete
+# every Store and, through the operator's finalizer, every provisioned store with it.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: stores.ahjin.dev
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    app.kubernetes.io/part-of: ahjin
+spec:
+  group: ahjin.dev
+  scope: Namespaced
+  names:
+    kind: Store
+    plural: stores
+    singular: store
+    listKind: StoreList
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - { name: Name, type: string, jsonPath: .spec.displayName }
+        - { name: Phase, type: string, jsonPath: .status.phase }
+        - { name: Step, type: string, jsonPath: .status.step }
+        - { name: URL, type: string, jsonPath: .status.url }
+        - { name: Owner, type: string, jsonPath: .spec.ownerEmail }
+        - { name: Age, type: date, jsonPath: .metadata.creationTimestamp }
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            metadata:
+              type: object
+              properties:
+                name:
+                  type: string
+                  # store-<name> must fit the gateway's 20-character tool prefix.
+                  pattern: '^[a-z][a-z0-9-]{1,13}$'
+            spec:
+              type: object
+              required: [displayName, ownerId, ownerEmail]
+              properties:
+                displayName: { type: string, minLength: 2, maxLength: 40 }
+                ownerId: { type: string, maxLength: 64 }
+                ownerEmail: { type: string, maxLength: 254 }
+                retry: { type: integer, minimum: 0 }
+            status:
+              type: object
+              properties:
+                phase: { type: string, enum: [Provisioning, Ready, Failed, Deleting] }
+                step: { type: string }
+                reason: { type: string }
+                message: { type: string, maxLength: 1000 }
+                url: { type: string }
+                namespace: { type: string }
+                upstreamSlug: { type: string }
+                startedAt: { type: string }
+                readyAt: { type: string }
+                observedRetry: { type: integer }

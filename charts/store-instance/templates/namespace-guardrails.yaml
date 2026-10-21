@@ -1,0 +1,98 @@
+# Guardrails for this store's namespace (Task 30): a ResourceQuota caps what the store may use, a
+# LimitRange gives defaults to anything that forgets, and default-deny NetworkPolicies make the
+# store's pods reachable only on the paths its own charts open. With them, one store's MCP server
+# can't reach another store's WordPress or database: those admit only their own namespace's pods.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: store-quota
+  labels:
+    app.kubernetes.io/part-of: ahjin
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  hard:
+    {{- range $resource, $amount := .Values.quota }}
+    {{ $resource }}: {{ $amount | quote }}
+    {{- end }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: store-limits
+  labels:
+    app.kubernetes.io/part-of: ahjin
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  limits:
+    - type: Container
+      default:
+        {{- toYaml .Values.limitRange.default | nindent 8 }}
+      defaultRequest:
+        {{- toYaml .Values.limitRange.defaultRequest | nindent 8 }}
+      max:
+        {{- toYaml .Values.limitRange.max | nindent 8 }}
+{{- if .Values.global.networkPolicy.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  labels:
+    app.kubernetes.io/part-of: ahjin
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress{{ if .Values.global.networkPolicy.egress.enabled }}, Egress{{ end }}]
+{{- if .Values.global.networkPolicy.egress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  labels:
+    app.kubernetes.io/part-of: ahjin
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.networkPolicy.egress.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.networkPolicy.egress.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+{{- end }}
+{{- if .Values.global.tls.enabled }}
+---
+# cert-manager's HTTP-01 solver for this store's certificate.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: acme-http01-solver
+  labels:
+    app.kubernetes.io/part-of: ahjin
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: 'true'
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.networkPolicy.ingressController.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.networkPolicy.ingressController.podLabels | nindent 14 }}
+      ports:
+        - port: 8089
+          protocol: TCP
+{{- end }}
+{{- end }}

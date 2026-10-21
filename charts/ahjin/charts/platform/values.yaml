@@ -57,3 +57,14 @@ secrets:
   bootstrapAdmin: gateway-bootstrap-admin
   # keys: groq-api-key, gemini-api-key
   llm: llm
+
+# Backups (Task 28): nightly and before every helm upgrade, into a volume Helm never deletes.
+backup:
+  enabled: true
+  schedule: '30 2 * * *'
+  timeZone: Asia/Kolkata
+  keep: 7
+  beforeUpgrade: true
+  persistence:
+    size: 1Gi
+    storageClass: ''

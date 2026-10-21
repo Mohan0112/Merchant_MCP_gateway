@@ -80,6 +80,7 @@ function toServerDto(
     hasCredential: Boolean(row.credentialCiphertext),
     timeoutMs: row.timeoutMs,
     seeded: row.seeded,
+    managedBy: row.managedBy,
     status,
     statusReason: status === 'unreachable' ? (state?.reason ?? null) : null,
     statusMessage: status === 'unreachable' ? (state?.message ?? null) : null,
@@ -211,6 +212,7 @@ export async function updateServer(
   input: UpdateServerRequest,
 ): Promise<Server> {
   const row = await findRow(deps.ctx, id);
+  assertNotManaged(row, input);
   if (input.url !== undefined && input.url !== row.url) await assertUrlAllowed(deps, input.url);
   const authType = input.authType ?? row.authType;
   const authHeaderName =
@@ -244,10 +246,108 @@ export async function updateServer(
 }
 
 export async function deleteServer(deps: ServersDeps, id: string): Promise<void> {
-  await findRow(deps.ctx, id);
+  assertNotManaged(await findRow(deps.ctx, id));
   await deps.ctx.db.delete(upstreamServers).where(eq(upstreamServers.id, id));
   await deps.manager.remove(id);
 }
+
+/**
+ * A server registered by a platform component (a provisioned store) belongs to it: only enabling
+ * or disabling it is allowed by hand. Deleting the store removes the server.
+ */
+function assertNotManaged(row: ServerRow, input?: UpdateServerRequest): void {
+  if (!row.managedBy) return;
+  const onlyToggle = input && Object.keys(input).every((key) => key === 'enabled');
+  if (!onlyToggle) {
+    throw conflict(
+      `This server is managed by the ${row.managedBy}. Change or delete its store instead.`,
+    );
+  }
+}
+
+export interface ManagedUpstream {
+  slug: string;
+  displayName: string;
+  url: string;
+  credential: string;
+  managedBy: string;
+}
+
+/**
+ * Creates or updates a server on behalf of a platform component (internal API). Idempotent, so
+ * the store operator can repeat it after a crash. A hand-registered server with the same slug is
+ * never taken over.
+ */
+export async function registerManaged(deps: ServersDeps, input: ManagedUpstream): Promise<Server> {
+  await assertUrlAllowed(deps, input.url);
+  const [existing] = await deps.ctx.db
+    .select()
+    .from(upstreamServers)
+    .where(eq(upstreamServers.slug, input.slug))
+    .limit(1);
+  if (existing && existing.managedBy !== input.managedBy) {
+    throw conflict(`Slug "${input.slug}" is already used by another server.`);
+  }
+  const columns = {
+    displayName: input.displayName,
+    url: input.url,
+    authType: 'bearer' as const,
+    authHeaderName: null,
+    ...sealCredential(deps.ctx, input.credential),
+    timeoutMs: 30_000,
+    managedBy: input.managedBy,
+  };
+  let id: string;
+  if (existing) {
+    await deps.ctx.db
+      .update(upstreamServers)
+      .set({ ...columns, updatedAt: deps.ctx.now() })
+      .where(eq(upstreamServers.id, existing.id));
+    id = existing.id;
+  } else {
+    const [row] = await deps.ctx.db
+      .insert(upstreamServers)
+      .values({ slug: input.slug, enabled: true, ...columns })
+      .returning();
+    id = row!.id;
+  }
+  await deps.manager.reload(id);
+  deps.ctx.logger.info(
+    { slug: input.slug, managedBy: input.managedBy },
+    'managed server registered',
+  );
+  return toServerDto(deps, await findRow(deps.ctx, id), SYSTEM_VIEWER, NO_TOOLS);
+}
+
+/** Removes a managed server; true when there was one. */
+export async function unregisterManaged(
+  deps: ServersDeps,
+  slug: string,
+  managedBy: string,
+): Promise<boolean> {
+  const [row] = await deps.ctx.db
+    .select()
+    .from(upstreamServers)
+    .where(eq(upstreamServers.slug, slug))
+    .limit(1);
+  if (!row) return false;
+  if (row.managedBy !== managedBy)
+    throw conflict(`Server "${slug}" isn't managed by ${managedBy}.`);
+  await deps.ctx.db.delete(upstreamServers).where(eq(upstreamServers.id, row.id));
+  await deps.manager.remove(row.id);
+  deps.ctx.logger.info({ slug, managedBy }, 'managed server removed');
+  return true;
+}
+
+/** Internal calls see servers as an admin would. */
+const SYSTEM_VIEWER = {
+  userId: 'system',
+  email: 'system',
+  name: 'system',
+  role: 'admin',
+  mustChangePassword: false,
+  sessionId: 'system',
+} as Principal;
 
 export async function refreshServer(
   deps: ServersDeps,

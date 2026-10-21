@@ -208,6 +208,33 @@ export class UpstreamManager extends EventEmitter {
     return targets.length;
   }
 
+  /** Every enabled server's status and tool counts (for metrics and summaries). */
+  statuses(): Array<{
+    serverId: string;
+    slug: string;
+    displayName: string;
+    status: ConnectionState['status'];
+    reason: ConnectionState['reason'];
+    message: string | null;
+    visibleTools: number;
+    pendingTools: number;
+  }> {
+    return [...this.live.values()].map(({ row, connection, pins }) => {
+      const state = connection.snapshot();
+      const visible = state.status === 'connected' ? pins.visible(state.tools).length : 0;
+      return {
+        serverId: row.id,
+        slug: row.slug,
+        displayName: row.displayName,
+        status: state.status,
+        reason: state.reason,
+        message: state.message,
+        visibleTools: visible,
+        pendingTools: state.status === 'connected' ? state.tools.length - visible : 0,
+      };
+    });
+  }
+
   async stopAll(): Promise<void> {
     await Promise.all([...this.live.keys()].map((id) => this.close(id)));
   }

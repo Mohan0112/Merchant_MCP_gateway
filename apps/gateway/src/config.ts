@@ -55,6 +55,16 @@ const ConfigSchema = z.object({
   GEMINI_API_KEY: z.string().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_BASE_URL: z.url().default('https://generativelanguage.googleapis.com/v1beta/openai/'),
+  /** Multi-store provisioning (Task 30): the gateway creates Store resources for the store-operator. */
+  STORES_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  STORES_MAX_PER_USER: z.coerce.number().int().min(0).max(50).default(2),
+  /** The gateway's own namespace, where Store resources live (downward API). */
+  POD_NAMESPACE: z.string().default('ahjin'),
+  /** Shared with the store-operator for /internal (Secret gateway-internal); unset disables /internal. */
+  INTERNAL_TOKEN: z.string().min(32).optional(),
   /** What the chat assistant is told about the business until an admin edits it in the dashboard. */
   CHAT_CONTEXT: z.string().max(6000).default(''),
   APP_VERSION: z.string().default('0.1.0'),

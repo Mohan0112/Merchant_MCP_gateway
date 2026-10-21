@@ -1,0 +1,236 @@
+{{- $ns := .Release.Namespace }}
+{{- $sa := printf "system:serviceaccount:%s:store-operator" $ns }}
+# The store-operator (Task 30): reconciles Store resources into namespaces, Helm releases and
+# gateway registrations. It is the only component with cluster-wide Kubernetes rights, and an
+# admission policy below confines those rights to store-* namespaces.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: store-operator
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+---
+# Its own Store resources, in the platform namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: store-operator
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+rules:
+  - apiGroups: [ahjin.dev]
+    resources: [stores]
+    verbs: [get, list, watch, patch, update]
+  - apiGroups: [ahjin.dev]
+    resources: [stores/status, stores/finalizers]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: store-operator
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: store-operator }
+subjects:
+  - { kind: ServiceAccount, name: store-operator, namespace: {{ $ns }} }
+---
+# What a store's Helm release creates, plus namespaces. RBAC can't limit these to a name prefix,
+# so the ValidatingAdmissionPolicy below does: writes outside store-* namespaces are refused.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $ns }}-store-operator
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+rules:
+  - apiGroups: ['']
+    resources: [namespaces]
+    verbs: [get, list, watch, create, patch, delete]
+  - apiGroups: ['']
+    resources: [secrets, configmaps, services, persistentvolumeclaims, resourcequotas, limitranges]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ['']
+    resources: [pods, events, endpoints]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [apps]
+    resources: [replicasets, controllerrevisions]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, networkpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $ns }}-store-operator
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ $ns }}-store-operator }
+subjects:
+  - { kind: ServiceAccount, name: store-operator, namespace: {{ $ns }} }
+---
+# Least privilege where RBAC stops: any write by the operator's service account must target a
+# store-* namespace (or be the namespace itself), apart from its own Store resources here.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $ns }}-store-operator-scope
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['*']
+        apiVersions: ['*']
+        operations: [CREATE, UPDATE, DELETE]
+        resources: ['*', '*/*']
+  matchConditions:
+    - name: store-operator-only
+      expression: request.userInfo.username == {{ $sa | quote }}
+  validations:
+    - expression: >-
+        request.resource.resource == 'namespaces'
+          ? request.name.startsWith('store-')
+          : (request.namespace.startsWith('store-')
+             || (request.namespace == {{ $ns | quote }} && request.resource.group == 'ahjin.dev'))
+      messageExpression: >-
+        'the store operator may only change store-* namespaces (refused: ' +
+        request.resource.resource + ' ' + request.name + ' in "' + request.namespace + '")'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $ns }}-store-operator-scope
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+spec:
+  policyName: {{ $ns }}-store-operator-scope
+  validationActions: [Deny]
+---
+# The Helm values every store starts from: the platform's global settings and the store images.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: store-operator-values
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+data:
+  values.json: {{ include "stores.baseValues" . | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-operator
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+spec:
+  replicas: 1
+  # One reconciler at a time; a restarted pod resumes where the last one stopped.
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      {{- include "stores.selectorLabels" (list . "store-operator") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stores.labels" (list . "store-operator") | nindent 8 }}
+      annotations:
+        checksum/values: {{ include "stores.baseValues" . | sha256sum | trunc 16 }}
+    spec:
+      serviceAccountName: store-operator
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: store-operator
+          image: "{{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag }}"
+          imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          args: [server.mjs]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            - name: GATEWAY_URL
+              value: http://gateway:8080
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.internalSecret }}, key: token }
+            - name: PROVISION_TIMEOUT_MS
+              value: {{ .Values.provisionTimeoutMinutes | mul 60000 | quote }}
+            - name: MAX_PARALLEL
+              value: {{ .Values.maxParallel | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.global.logLevel | quote }}
+            # Helm keeps its cache and config under /tmp (the root filesystem is read-only).
+            - { name: HELM_CACHE_HOME, value: /tmp/helm/cache }
+            - { name: HELM_CONFIG_HOME, value: /tmp/helm/config }
+            - { name: HELM_DATA_HOME, value: /tmp/helm/data }
+          startupProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.operator.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: values, mountPath: /etc/store-operator, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: values
+          configMap: { name: store-operator-values }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+{{- if .Values.global.networkPolicy.enabled }}
+---
+# Nothing connects to the operator (probes come from the node). It reaches the Kubernetes API and
+# the gateway's internal API, nothing else.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: store-operator
+  labels:
+    {{- include "stores.labels" (list . "store-operator") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "stores.selectorLabels" (list . "store-operator") | nindent 6 }}
+  policyTypes: [Ingress{{ if .Values.global.networkPolicy.egress.enabled }}, Egress{{ end }}]
+  ingress: []
+  {{- if .Values.global.networkPolicy.egress.enabled }}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+      ports:
+        - port: 8080
+          protocol: TCP
+    {{- include "ahjin.kubeApiEgress" . | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -56,6 +56,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/mysql
+            {{- if .Values.backup.enabled }}
+            # Read-only, and only so the backup volume binds on this node: local-path volumes bind
+            # on first use, and the backup jobs then run next to the data they protect.
+            - name: backups
+              mountPath: /backups
+              readOnly: true
+            {{- end }}
           # healthcheck.sh ships with the official image and uses a healthcheck-only DB user.
           startupProbe:
             exec:
@@ -77,6 +84,11 @@ spec:
             {{- toYaml .Values.mariadb.resources | nindent 12 }}
           securityContext:
             {{- include "store.containerSecurityContext" . | nindent 12 }}
+      {{- if .Values.backup.enabled }}
+      volumes:
+        - name: backups
+          persistentVolumeClaim: { claimName: store-backups, readOnly: true }
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data

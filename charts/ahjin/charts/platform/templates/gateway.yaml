@@ -12,6 +12,22 @@ spec:
       port: 8080
       targetPort: http
 ---
+# Headless: resolves to every ready gateway pod, so Prometheus scrapes each replica's /metrics.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-metrics
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "platform.selectorLabels" (list . "gateway") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -32,7 +48,12 @@ spec:
       labels:
         {{- include "platform.labels" (list . "gateway") | nindent 8 }}
     spec:
+      {{- if .Values.global.stores.enabled }}
+      serviceAccountName: gateway
+      automountServiceAccountToken: true
+      {{- else }}
       automountServiceAccountToken: false
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -98,6 +119,20 @@ spec:
               value: {{ .groqModel | quote }}
             - name: GEMINI_MODEL
               value: {{ .geminiModel | quote }}
+            {{- end }}
+            {{- if .Values.global.stores.enabled }}
+            - name: STORES_ENABLED
+              value: "true"
+            - name: STORES_MAX_PER_USER
+              value: {{ .Values.global.stores.maxPerUser | quote }}
+            - name: POD_NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef: { name: gateway-internal, key: token }
+            # The provisioned stores' MCP servers live in store-* namespaces (SSRF allow-list).
+            - name: UPSTREAM_PRIVATE_HOSTS
+              value: "woo-mcp.store-*.svc.cluster.local"
             {{- end }}
             {{- with .Values.gateway.chat.context }}
             - name: CHAT_CONTEXT

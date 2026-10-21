@@ -1,0 +1,31 @@
+{{- if .Values.global.stores.enabled }}
+# The gateway's only Kubernetes rights: Store resources in its own namespace (Task 30). It never
+# touches namespaces, Secrets or workloads; the store operator does.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gateway
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gateway-stores
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+rules:
+  - apiGroups: [ahjin.dev]
+    resources: [stores]
+    verbs: [get, list, create, delete, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gateway-stores
+  labels:
+    {{- include "platform.labels" (list . "gateway") | nindent 4 }}
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: gateway-stores }
+subjects:
+  - { kind: ServiceAccount, name: gateway, namespace: {{ .Release.Namespace }} }
+{{- end }}

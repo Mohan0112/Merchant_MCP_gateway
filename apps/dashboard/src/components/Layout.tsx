@@ -51,6 +51,12 @@ const ICONS = {
       <path d="m9 12 2 2 4-4" />
     </>,
   ),
+  stores: icon(
+    <>
+      <path d="M3 9l1.5-5h15L21 9M3 9h18v11H3zM9 20v-6h6v6" />
+    </>,
+  ),
+  insights: icon(<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />),
   members: icon(
     <>
       <circle cx="9" cy="8" r="4" />
@@ -88,11 +94,17 @@ export function Layout() {
         <NavLink to="/chat" className={link}>
           {ICONS.chat} Chat
         </NavLink>
+        <NavLink to="/stores" className={link}>
+          {ICONS.stores} Stores
+        </NavLink>
         <NavLink to="/keys" className={link}>
           {ICONS.keys} API keys
         </NavLink>
         <NavLink to="/audit" className={link}>
           {ICONS.audit} Audit log
+        </NavLink>
+        <NavLink to="/insights" className={link}>
+          {ICONS.insights} Insights
         </NavLink>
         {me?.role === 'admin' ? (
           <>

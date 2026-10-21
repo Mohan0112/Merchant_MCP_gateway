@@ -39,13 +39,13 @@ Legend: ✅ done · 🔄 in progress · ⏳ not started · ⏸️ deferred
 | 21 | Demo video | ⏳ | Owner records |
 | 22 | Security hardening | ✅ | SSRF guard (registration and connect time), tool-definition pinning, default-deny egress, `restricted` Pod Security, Trivy in CI; 26/26 live network probes |
 | 23 | Tool permissions | ✅ | Per-role and per-user rules; hidden from `tools/list`, refused on `tools/call`; Permissions page; checked by `task dod` |
-| 24 | Observability | ⏳ | Next |
+| 24 | Observability | ✅ | `/metrics` (Prometheus), Prometheus with alert rules, Grafana dashboard, dashboard Insights page; a killed upstream shows as down with its reason within one scrape |
 | 25 | Scaling and rate limits | ⏳ | |
 | 26 | Many-tools handling | ⏳ | |
 | 27 | OAuth on the gateway | ⏳ | |
-| 28 | Upgrades and rollback | ⏳ | |
+| 28 | Upgrades and rollback | ✅ | Nightly and pre-upgrade backups of both databases, `task backup:*`, restore drill passed |
 | 29 | Hosted MCP servers | ⏳ | |
-| 30 | Bonus: multi-store provisioning | ⏳ | |
+| 30 | Bonus: multi-store provisioning | 🔄 | Store CRD, operator, store-instance chart, gateway API and Stores page built and unit-tested; switched off until the live run |
 | 31 | Live VPS deployment | ⏸️ | Deferred by the owner |
 | 32 | Ahjin everywhere | ✅ | Every technical name, token format and document now uses the shop's name; fresh `ahjin` cluster, DoD 19/19 |
 | 33 | Chat context and guardrails | ✅ | Admin-editable business context; jailbreak screening, secret redaction, grounding re-check; approval before irreversible changes; woo-mcp category filters |
@@ -126,6 +126,73 @@ Common problems:
 ---
 
 ## Log
+
+### 2026-10-22 · Task 28: Upgrades and rollback (backups) · ✅
+
+**What was done**
+- **Backups in the charts.**
+  - The store sub-chart dumps MariaDB with `mariadb-dump --single-transaction --triggers` (gzip) into PVC `store-backups`.
+  - The platform sub-chart dumps PostgreSQL with `pg_dump --clean --if-exists --no-owner` into PVC `platform-backups`.
+  - Each runs as a nightly CronJob (02:30 Asia/Kolkata) and as a `pre-upgrade` Helm hook. A failed backup stops the upgrade.
+  - The newest 7 dumps are kept (`backup.keep`). The volumes have `helm.sh/resource-policy: keep`.
+  - Passwords come from the Secrets through `MYSQL_PWD` and `PGPASSWORD`, never a command line.
+- **The hook is rendered only once its volume exists** (`lookup`). On the upgrade that creates the volume there's nothing to back up into yet, and Helm can't order a hook after a normal resource.
+- **Backups run next to their database.** Each database pod mounts its backup volume read-only, so a local-path volume binds on the database's node on first use. The backup pods also carry a pod affinity to their database.
+- **NetworkPolicies:** MariaDB admits `store-backup`; Postgres admits `platform-backup`; each backup pod's egress reaches only its own database.
+- **`scripts/backup.mjs`**, wired up as `task backup:now`, `backup:list` and `backup:restore COMPONENT=store|platform [NAME=…]` (the last asks for confirmation):
+  - `now` runs Jobs from the CronJobs.
+  - `list` and `restore` use a one-off restricted pod that mounts the volume.
+  - A restore stops the writers (WordPress, or the gateway) and suspends the component's CronJobs, loads the dump, then always starts them again.
+- **Docs:** a new runbook, [backup-and-restore.md](runbooks/backup-and-restore.md). [upgrade-and-rollback.md](runbooks/upgrade-and-rollback.md) now says backups before an upgrade are automatic, and restoring after a WooCommerce rollback is one command. Migrations note: four so far, all expand-only.
+
+**Verification**
+- The upgrade to chart 0.7.0 took a store backup through the pre-upgrade hook (`20261021T203713Z.sql.gz`, 52 KB).
+- **Drill:**
+  1. `backup now` wrote a 52 KB store dump and a 16 KB platform dump.
+  2. A product was created (the catalogue went from 19 to 20), and a marker row was added to `system_settings`.
+  3. Both components were restored from `latest`.
+  4. Afterwards: 19 products, product 84 gone, the marker gone. The gateway answered 401 (up, no session) and the storefront 200.
+- `task dod` right after the drill: **22 of 22**.
+
+**Problems and fixes**
+1. **`helm --wait` failed on the new backup volumes.** local-path binds a volume only when a pod first uses it, so the volumes stayed Pending, and Helm 4's readiness check waits for a Pending volume. Fix: the database pods mount their backup volume read-only.
+2. **Then Postgres couldn't be scheduled.** The pre-upgrade backup pod had bound `platform-backups` to the other node first, and Postgres's data volume is on `agent-0`. This only happened because the volume was created by a failed revision without the mount. Fix: backup pods now require pod affinity to their database. The misplaced volume, holding one dump, was re-created with Helm's ownership metadata, so the next upgrade adopted it.
+3. **The first restore failed with `Can't connect to server on 'mariadb' (115)`.** This is the known NetworkPolicy delay: a new pod is admitted a moment after it starts. The restore now waits for the database (`mariadb-admin ping` / `pg_isready`), as the backup Job already did.
+
+### 2026-10-22 · Task 24: Observability · ✅
+
+**What was done**
+- **Gateway metrics** (`modules/metrics/metrics.ts`, `prom-client`) on `GET /metrics`, internal only: the Ingress routes `/metrics` to the dashboard, and the gateway's NetworkPolicy admits only Traefik and Prometheus. Metrics:
+  - `ahjin_tool_calls_total{server,tool,channel,outcome}`;
+  - `ahjin_tool_call_errors_total{server,outcome}`;
+  - `ahjin_tool_call_duration_seconds` (histogram) by server and outcome;
+  - `ahjin_upstream_up{server,status,reason}`, `ahjin_upstream_tools` and `ahjin_upstream_tools_pending_review`, read from the connection manager at scrape time;
+  - `ahjin_mcp_auth_denied_total{reason}` and `ahjin_chat_turns_total{result}`;
+  - Node process metrics.
+  
+  Call metrics are fed from the invoker's single `CallAudit` point (a `CallObserver` interface), so metrics and the audit log can't disagree.
+- **Observability sub-chart** (`charts/ahjin/charts/observability`, `observability.enabled`):
+  - **Prometheus v3.15.0.** It scrapes every gateway replica through the new headless Service `gateway-metrics` (DNS discovery, so no Kubernetes API access and no RBAC). Retention 2 days on an emptyDir. Four alert rules: `UpstreamDown`, `ToolErrorRateHigh`, `ToolCallsSlow`, `ToolsAwaitingReview`.
+  - **Grafana 13.2.2** at `grafana.<domain>`. The Prometheus datasource and the gateway dashboard (`files/grafana-dashboard.json`, 10 panels, generated) are provisioned. Login from Secret `grafana-admin`. Offline by design: no plugin preinstall, update checks or reporting.
+  - Both restricted and non-root with read-only root filesystems, each with its own NetworkPolicies: Grafana → Prometheus → gateway only.
+- **Insights in the dashboard** (`GET /api/insights?hours=`; admins see everyone, members only their own calls):
+  - stat tiles;
+  - an hourly stacked column chart (answered, refused, failed), with legend, tooltips, keyboard focus and a table view;
+  - a per-server table with live status and reason, calls, failure rate, p50/p95 latency and the last failure;
+  - the busiest tools.
+  
+  The chart colours were checked with the dataviz palette validator in both modes (light `#2a78d6/#eda100/#d03b3b`, dark `#3987e5/#c98500/#d03b3b`). "Open Grafana" for admins.
+- `task logins` prints the Grafana login; the chart NOTES list Grafana and how to reach Prometheus.
+
+**Verification**
+- Gateway test (3 calls: two `echo`, one `fail`): the Prometheus text has `ahjin_tool_calls_total{…outcome="success"} 2`, `ahjin_tool_call_errors_total{…tool_error} 1`, `ahjin_upstream_up{server="alpha",status="connected",reason=""} 1` and the histogram buckets. Insights totals, p50, the timeline and the top tools match.
+- **Live:** Prometheus scrapes the gateway (`up`). With fx-mcp scaled to 0, `ahjin_upstream_up{server="fx",status="unreachable",reason="CONNECTION_REFUSED"} 0` appeared within 30 s and returned to `1` after scaling back up. `UpstreamDown` correctly didn't fire, since its `for: 1m` wasn't reached.
+- Grafana dashboard screenshot: three upstreams connected, the status table, latency and chat-turn series. The Insights page rendered with no console errors in light and dark.
+
+**Problems and fixes**
+1. **Grafana 13 was killed by its liveness probe.** Its first start runs its own migrations, which took about 2 minutes at a 500m CPU limit. Fix: a `startupProbe` (up to 5 minutes) and a 1-CPU limit.
+2. **The Grafana image is about 1.9 GB.** It stays optional (`observability.grafana.enabled`); the dashboard's Insights page covers the same questions without it.
+3. **Chart axis labels.** The first render clipped the top tick label and the last time label, and the plot was too tall. Fixed with padding and a wider viewBox.
 
 ### 2026-10-22 · Task 23: Tool permissions · ✅
 

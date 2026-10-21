@@ -1,0 +1,5 @@
+apiVersion: v2
+name: observability
+description: Prometheus (with alert rules) scraping every gateway replica, and an optional Grafana with the gateway dashboard
+type: application
+version: 0.1.0

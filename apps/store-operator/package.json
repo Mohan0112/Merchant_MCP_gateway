@@ -1,0 +1,18 @@
+{
+  "name": "store-operator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Provisions a WooCommerce store per Store resource (namespace, Secrets, Helm release, MCP registration) and tears it down",
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ahjin/kube": "workspace:*",
+    "@ahjin/logger": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

@@ -22,6 +22,13 @@
       "when": 1792612314703,
       "tag": "0002_tool_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792614323245,
+      "tag": "0003_managed_upstreams",
+      "breakpoints": true
     }
   ]
 }

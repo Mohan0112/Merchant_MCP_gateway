@@ -40,6 +40,16 @@ global:
         - 169.254.0.0/16
         - 172.16.0.0/12
         - 192.168.0.0/16
+    # The Kubernetes API server, for the store operator and the gateway when stores are on.
+    # Empty cidrs: discovered from the default/kubernetes EndpointSlice at install time.
+    kubeApi:
+      cidrs: []
+      ports: [443, 6443]
+  # Multi-store provisioning (Task 30): users create stores from the dashboard; the store operator
+  # (stores sub-chart) gives each its own namespace, Helm release and MCP server.
+  stores:
+    enabled: false
+    maxPerUser: 2
 
 # cert-manager ClusterIssuers rendered by this chart (cert-manager itself, with its CRDs, is a
 # prerequisite installed separately). Point global.tls.clusterIssuer at one of them.
@@ -101,6 +111,11 @@ fx-mcp:
   resources:
     requests: { cpu: 25m, memory: 48Mi }
     limits: { cpu: 200m, memory: 128Mi }
+
+# Prometheus scraping every gateway replica (alert rules included) and Grafana with the gateway
+# dashboard at grafana.<domain> (Task 24). The dashboard's Insights page works without them.
+observability:
+  enabled: true
 
 # Gateway (REST API, aggregating MCP endpoint, chat module), its PostgreSQL, and later the dashboard.
 platform:

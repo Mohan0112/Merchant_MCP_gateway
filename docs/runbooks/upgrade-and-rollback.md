@@ -19,7 +19,7 @@ kubectl --context ahjin-vps -n ahjin get pods
    helm --kube-context ahjin-vps -n ahjin get manifest ahjin > current.yaml
    diff current.yaml new.yaml
    ```
-3. **Back up the databases** if the release touches the store or the schema (commands in [vps.md](vps.md#9-upgrades-rollback-and-backups)).
+3. **Backups are automatic:** the chart's `pre-upgrade` hooks dump MariaDB and PostgreSQL into their backup volumes before Helm changes anything, and a failed backup stops the upgrade. `task backup:list` shows them ([backup-and-restore.md](backup-and-restore.md)).
 4. **Upgrade:**
    ```sh
    task deploy:prod PROD_CONTEXT=ahjin-vps DOMAIN=<domain> LETSENCRYPT_EMAIL=<email> IMAGE_TAG=<sha>
@@ -41,8 +41,8 @@ A rollback is itself a new revision, so it can be undone the same way.
 ## Data and migrations
 
 - **Volumes survive** upgrades, rollbacks and even `helm uninstall`. StatefulSet volume claims aren't deleted with the release, and the uploads PVC has `helm.sh/resource-policy: keep`.
-- **Gateway migrations are expand-only.** The `migrate` init container applies pending migrations before the new gateway starts. A release may only add tables and columns; removals ship one release later, so the previous gateway always works with the current schema and `helm rollback` is safe. Today there is a single migration (`apps/gateway/drizzle/0000_initial_schema.sql`).
-- **WooCommerce is different.** A new store image can bring a WooCommerce version whose database updates the bootstrap hook applies (`wp wc update`). Helm can't undo those, so a rollback after a WooCommerce upgrade needs the MariaDB dump taken in step 3 of the upgrade.
+- **Gateway migrations are expand-only.** The `migrate` init container applies pending migrations before the new gateway starts. A release may only add tables and columns; removals ship one release later, so the previous gateway always works with the current schema and `helm rollback` is safe. There are four migrations so far (`apps/gateway/drizzle/0000`–`0003`), and every one only adds: tool pinning columns, the tool permissions table, the `managed_by` column.
+- **WooCommerce is different.** A new store image can bring a WooCommerce version whose database updates the bootstrap hook applies (`wp wc update`). Helm can't undo those, so a rollback after a WooCommerce upgrade also restores the database from the backup the pre-upgrade hook took: `helm rollback`, then `task backup:restore COMPONENT=store NAME=<that file>`.
 
 ## What a failed upgrade costs
 

@@ -1,0 +1,1 @@
+ALTER TABLE "upstream_servers" ADD COLUMN "managed_by" text;

@@ -1,0 +1,131 @@
+{{- $ns := .Release.Namespace }}
+# Prometheus scrapes every gateway replica: the headless Service gateway-metrics resolves to one
+# A record per ready pod, so DNS discovery needs no Kubernetes API access (and no RBAC).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  labels:
+    {{- include "observability.labels" (list . "prometheus") | nindent 4 }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ .Values.prometheus.scrapeInterval }}
+      evaluation_interval: {{ .Values.prometheus.scrapeInterval }}
+    rule_files:
+      - /etc/prometheus/alerts.yml
+    scrape_configs:
+      - job_name: gateway
+        metrics_path: /metrics
+        dns_sd_configs:
+          - names: [gateway-metrics.{{ $ns }}.svc.cluster.local]
+            type: A
+            port: 8080
+            refresh_interval: 15s
+      - job_name: prometheus
+        static_configs:
+          - targets: [localhost:9090]
+  # Shown on Prometheus's Alerts page (no Alertmanager: notifications are out of scope locally).
+  alerts.yml: |
+    groups:
+      - name: ahjin-gateway
+        rules:
+          - alert: UpstreamDown
+            expr: ahjin_upstream_up == 0
+            for: 1m
+            labels: { severity: warning }
+            annotations:
+              summary: {{ `"MCP server {{ $labels.server }} is {{ $labels.status }} ({{ $labels.reason }})"` }}
+          - alert: ToolErrorRateHigh
+            expr: |
+              sum by (server) (rate(ahjin_tool_call_errors_total[5m]))
+                / sum by (server) (rate(ahjin_tool_calls_total[5m])) > 0.2
+            for: 5m
+            labels: { severity: warning }
+            annotations:
+              summary: {{ `"More than 20% of calls to {{ $labels.server }} fail"` }}
+          - alert: ToolCallsSlow
+            expr: |
+              histogram_quantile(0.95,
+                sum by (server, le) (rate(ahjin_tool_call_duration_seconds_bucket[5m]))) > 5
+            for: 5m
+            labels: { severity: info }
+            annotations:
+              summary: {{ `"p95 latency of {{ $labels.server }} is above 5 s"` }}
+          - alert: ToolsAwaitingReview
+            expr: ahjin_upstream_tools_pending_review > 0
+            labels: { severity: info }
+            annotations:
+              summary: {{ `"{{ $labels.server }} changed tool definitions; an admin needs to review them"` }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  labels:
+    {{- include "observability.labels" (list . "prometheus") | nindent 4 }}
+spec:
+  selector:
+    {{- include "observability.selectorLabels" (list . "prometheus") | nindent 4 }}
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    {{- include "observability.labels" (list . "prometheus") | nindent 4 }}
+spec:
+  replicas: 1
+  # One writer per TSDB directory.
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      {{- include "observability.selectorLabels" (list . "prometheus") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "observability.labels" (list . "prometheus") | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Values.prometheus | toJson | sha256sum | trunc 16 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: prometheus
+          image: "{{ .Values.prometheus.image.repository }}:{{ .Values.prometheus.image.tag }}"
+          imagePullPolicy: {{ .Values.prometheus.image.pullPolicy }}
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time={{ .Values.prometheus.retention }}
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet: { path: /-/ready, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /-/healthy, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.prometheus.resources | nindent 12 }}
+          securityContext:
+            {{- include "observability.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /etc/prometheus, readOnly: true }
+            - { name: data, mountPath: /prometheus }
+      volumes:
+        - name: config
+          configMap: { name: prometheus-config }
+        - name: data
+          emptyDir: { sizeLimit: 1Gi }

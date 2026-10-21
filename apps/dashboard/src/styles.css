@@ -765,3 +765,154 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- charts (Insights) ---------- */
+/* Mark colors validated with the dataviz palette checks (light and dark steps). Text never wears
+   them: labels, values and legends use the ink tokens; a swatch or key beside the text carries
+   the identity. */
+.viz {
+  --viz-ok: #2a78d6;
+  --viz-refused: #eda100;
+  --viz-errors: #d03b3b;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-tick: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  .viz {
+    --viz-ok: #3987e5;
+    --viz-refused: #c98500;
+    --viz-errors: #d03b3b;
+    --viz-grid: #2c2c2a;
+    --viz-axis: #383835;
+  }
+}
+.viz figcaption {
+  margin: 0;
+}
+figure.viz {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.viz-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.viz-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.viz-plot {
+  position: relative;
+}
+.viz-plot svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.viz-grid {
+  stroke: var(--viz-grid);
+  stroke-width: 1;
+}
+.viz-baseline {
+  stroke: var(--viz-axis);
+  stroke-width: 1;
+}
+.viz-tick {
+  fill: var(--viz-tick);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.viz rect[tabindex]:focus {
+  outline: none;
+  fill: rgb(127 127 127 / 8%);
+}
+.viz-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  z-index: 2;
+}
+.viz-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+.viz-key {
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+}
+.viz-hbars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.viz-hbar {
+  display: grid;
+  grid-template-columns: minmax(120px, 240px) 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.viz-hbar-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.viz-hbar-fill {
+  height: 14px;
+  min-width: 2px;
+  background: var(--viz-ok);
+  border-radius: 0 4px 4px 0;
+}
+.viz-hbar-value {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.kpi-row .card + .card {
+  margin-top: 0;
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-value {
+  font-size: 26px;
+  font-weight: 600;
+}
+.filter-row {
+  margin-bottom: 12px;
+}
+table.numeric td {
+  font-variant-numeric: tabular-nums;
+}

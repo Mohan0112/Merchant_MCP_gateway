@@ -1,6 +1,6 @@
 {{- if .Values.global.networkPolicy.enabled }}
 {{- $ic := .Values.global.networkPolicy.ingressController }}
-# PostgreSQL: only the gateway pod. Its migrate initContainer runs in the same pod, so it is covered.
+# PostgreSQL: only the gateway pod (its migrate initContainer runs in the same pod) and the backup job.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -17,6 +17,9 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: gateway
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: platform-backup
       ports:
         - port: postgres
           protocol: TCP
@@ -45,6 +48,16 @@ spec:
           podSelector:
             matchLabels:
               {{- toYaml $ic.podLabels | nindent 14 }}
+        {{- if eq $name "gateway" }}
+        # Prometheus (observability sub-chart) scrapes /metrics; the store operator calls
+        # /internal (stores sub-chart). The Ingress routes neither.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: store-operator
+        {{- end }}
       ports:
         - port: http
           protocol: TCP
@@ -88,6 +101,9 @@ spec:
       ports:
         - port: 8080
           protocol: TCP
+    {{- if .Values.global.stores.enabled }}
+    {{- include "ahjin.kubeApiEgress" . | nindent 4 }}
+    {{- end }}
     {{- with .Values.gateway.networkPolicy.internetPorts }}
     - to:
         - ipBlock:
@@ -100,4 +116,27 @@ spec:
           protocol: TCP
         {{- end }}
     {{- end }}
+{{- end }}
+{{- if and .Values.global.networkPolicy.enabled .Values.global.networkPolicy.egress.enabled }}
+---
+# The backup job reaches PostgreSQL only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-backup-egress
+  labels:
+    {{- include "platform.labels" (list . "platform-backup") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: platform-backup
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "platform.selectorLabels" (list . "postgres") | nindent 14 }}
+      ports:
+        - port: 5432
+          protocol: TCP
 {{- end }}

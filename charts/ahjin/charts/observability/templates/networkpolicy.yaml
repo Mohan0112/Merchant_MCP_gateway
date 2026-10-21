@@ -1,0 +1,70 @@
+{{- if .Values.global.networkPolicy.enabled }}
+{{- $ic := .Values.global.networkPolicy.ingressController }}
+# Prometheus: reachable only from Grafana (operators use kubectl port-forward, which policies
+# don't apply to); it reaches only the gateway pods' metrics port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus
+  labels:
+    {{- include "observability.labels" (list . "prometheus") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "observability.selectorLabels" (list . "prometheus") | nindent 6 }}
+  policyTypes: [Ingress{{ if .Values.global.networkPolicy.egress.enabled }}, Egress{{ end }}]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - port: http
+          protocol: TCP
+  {{- if .Values.global.networkPolicy.egress.enabled }}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+      ports:
+        - port: 8080
+          protocol: TCP
+  {{- end }}
+{{- if .Values.grafana.enabled }}
+---
+# Grafana: the ingress controller in; Prometheus out.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana
+  labels:
+    {{- include "observability.labels" (list . "grafana") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "observability.selectorLabels" (list . "grafana") | nindent 6 }}
+  policyTypes: [Ingress{{ if .Values.global.networkPolicy.egress.enabled }}, Egress{{ end }}]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $ic.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $ic.podLabels | nindent 14 }}
+      ports:
+        - port: http
+          protocol: TCP
+  {{- if .Values.global.networkPolicy.egress.enabled }}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "observability.selectorLabels" (list . "prometheus") | nindent 14 }}
+      ports:
+        - port: 9090
+          protocol: TCP
+  {{- end }}
+{{- end }}
+{{- end }}

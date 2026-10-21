@@ -1,0 +1,29 @@
+# Multi-store provisioning (Task 30). Switched on with global.stores.enabled in the umbrella chart.
+
+operator:
+  image:
+    repository: ahjin-registry:5000/ahjin-store-operator
+    tag: dev
+    pullPolicy: IfNotPresent
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: '1', memory: 512Mi }
+
+# Images every provisioned store runs (the platform's own store and woo-mcp images).
+images:
+  wordpress:
+    repository: ahjin-registry:5000/ahjin-wordpress
+    tag: dev
+    pullPolicy: IfNotPresent
+  wooMcp:
+    repository: ahjin-registry:5000/ahjin-woo-mcp
+    tag: dev
+    pullPolicy: IfNotPresent
+
+# A store that isn't Ready by then is marked Failed with the reason (it can be retried).
+provisionTimeoutMinutes: 15
+# Stores provisioned at the same time.
+maxParallel: 3
+
+# Secret (key token) shared by the gateway and the operator for the gateway's internal API.
+internalSecret: gateway-internal

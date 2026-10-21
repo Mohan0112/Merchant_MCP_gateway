@@ -213,6 +213,8 @@ export const ServerSchema = z.object({
   toolCount: z.number(),
   /** Tools whose definition changed or appeared since an admin approved the server's tools. */
   pendingToolCount: z.number(),
+  /** Set for servers a platform component registered (a provisioned store): edit the store instead. */
+  managedBy: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -235,6 +237,43 @@ export const TestConnectionResultSchema = z.discriminatedUnion('ok', [
 ]);
 export type TestConnectionResult = z.infer<typeof TestConnectionResultSchema>;
 
+// ---------- Stores (multi-store provisioning) ----------
+
+/** 2-14 characters: it becomes the namespace (store-<slug>), host (<slug>.<domain>) and tool prefix. */
+export const StoreSlugSchema = z
+  .string()
+  .regex(
+    /^[a-z][a-z0-9-]{1,13}$/,
+    'Use 2-14 lowercase letters, digits or dashes, starting with a letter',
+  );
+
+export const CreateStoreRequestSchema = z.object({
+  name: z.string().trim().min(2).max(40),
+  slug: StoreSlugSchema,
+});
+export type CreateStoreRequest = z.infer<typeof CreateStoreRequestSchema>;
+
+export const StorePhaseSchema = z.enum(['Provisioning', 'Ready', 'Failed', 'Deleting']);
+export type StorePhase = z.infer<typeof StorePhaseSchema>;
+
+export const StoreSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  ownerId: z.string(),
+  ownerEmail: z.string(),
+  phase: StorePhaseSchema,
+  /** The step in progress (namespace, secrets, helm, registration) or the one that failed. */
+  step: z.string().nullable(),
+  reason: z.string().nullable(),
+  message: z.string().nullable(),
+  url: z.string().nullable(),
+  /** The gateway slug of the store's MCP server: its tools are <upstreamSlug>__list_orders, … */
+  upstreamSlug: z.string(),
+  createdAt: z.string().nullable(),
+  readyAt: z.string().nullable(),
+});
+export type Store = z.infer<typeof StoreSchema>;
+
 // ---------- Tool permissions ----------
 
 /** A server slug or '*' for every server. */
@@ -243,7 +282,7 @@ const PolicyServerSchema = z.union([z.literal('*'), SlugSchema]);
 const ToolPatternSchema = z
   .string()
   .trim()
-  .regex(/^[A-Za-z0-9_*.-]{1,128}$/, "Use a tool name, with * as a wildcard (e.g. create_*)");
+  .regex(/^[A-Za-z0-9_*.-]{1,128}$/, 'Use a tool name, with * as a wildcard (e.g. create_*)');
 
 export const PolicySchema = z.object({
   id: z.uuid(),
@@ -322,6 +361,52 @@ export const AuditQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 export type AuditQuery = z.infer<typeof AuditQuerySchema>;
+
+// ---------- Insights (observability) ----------
+
+export const InsightsQuerySchema = z.object({
+  hours: z.coerce.number().int().min(1).max(168).default(24),
+});
+
+export const ServerInsightSchema = z.object({
+  server: z.string(),
+  displayName: z.string().nullable(),
+  /** Live status from the gateway; null for servers that are gone or disabled. */
+  status: UpstreamStatusSchema.nullable(),
+  reason: UnreachableReasonSchema.nullable(),
+  message: z.string().nullable(),
+  calls: z.number(),
+  /** Failed upstream: tool errors, timeouts, unreachable. */
+  errors: z.number(),
+  /** Refused by the gateway: permissions, disabled server, unapproved or unknown tool. */
+  refused: z.number(),
+  p50Ms: z.number().nullable(),
+  p95Ms: z.number().nullable(),
+  lastError: z.string().nullable(),
+});
+export type ServerInsight = z.infer<typeof ServerInsightSchema>;
+
+export const InsightsSchema = z.object({
+  hours: z.number(),
+  /** True when the numbers cover only the signed-in member's own calls. */
+  ownOnly: z.boolean(),
+  totals: z.object({
+    calls: z.number(),
+    errors: z.number(),
+    refused: z.number(),
+    chat: z.number(),
+    mcpClient: z.number(),
+  }),
+  servers: z.array(ServerInsightSchema),
+  /** Calls per hour, oldest first, split by how they ended. */
+  timeline: z.array(
+    z.object({ at: z.string(), ok: z.number(), errors: z.number(), refused: z.number() }),
+  ),
+  topTools: z.array(
+    z.object({ server: z.string(), tool: z.string(), calls: z.number(), errors: z.number() }),
+  ),
+});
+export type Insights = z.infer<typeof InsightsSchema>;
 
 // ---------- Chat agent ----------
 

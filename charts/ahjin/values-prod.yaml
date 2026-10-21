@@ -9,6 +9,10 @@ global:
     enabled: true
     # Use letsencrypt-staging for the first install, then switch (docs/runbooks/vps.md).
     clusterIssuer: letsencrypt-prod
+  stores:
+    # Switched on once multi-store provisioning has passed its live run (Task 30).
+    enabled: false
+    maxPerUser: 2
 
 certManager:
   letsEncrypt:
@@ -62,3 +66,19 @@ platform:
       limits: { cpu: 1000m, memory: 1Gi }
     persistence:
       size: 5Gi
+  backup:
+    persistence:
+      size: 5Gi
+
+stores:
+  operator:
+    image:
+      repository: ghcr.io/mohan0112/merchant_mcp_gateway/store-operator
+      tag: CHANGE-ME-git-sha
+  images:
+    wordpress:
+      repository: ghcr.io/mohan0112/merchant_mcp_gateway/wordpress
+      tag: CHANGE-ME-git-sha
+    wooMcp:
+      repository: ghcr.io/mohan0112/merchant_mcp_gateway/woo-mcp
+      tag: CHANGE-ME-git-sha

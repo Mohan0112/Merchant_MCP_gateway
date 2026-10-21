@@ -15,11 +15,15 @@ import type { LlmProvider } from './modules/chat/llm';
 import { ApprovalTokens } from './modules/chat/approvals';
 import { registerChatRoutes } from './modules/chat/routes';
 import { ChatTokenStore } from './modules/chat/tokens';
+import { registerInsightsRoutes } from './modules/insights/service';
+import { registerInternalRoutes } from './modules/internal/routes';
 import { registerKeyRoutes } from './modules/keys/routes';
+import { GatewayMetrics } from './modules/metrics/metrics';
 import { registerPolicyRoutes } from './modules/policies/routes';
 import { ToolPolicies } from './modules/policies/service';
 import { registerServerRoutes } from './modules/servers/routes';
 import { AssistantSettingsStore, registerSettingsRoutes } from './modules/settings/assistant';
+import { registerStoreRoutes, StoreService, type StoresOptions } from './modules/stores/service';
 
 export interface GatewayModuleOptions {
   /** How upstream MCP connections are made: the SDK in production, the same SDK against in-process servers in tests. */
@@ -31,6 +35,10 @@ export interface GatewayModuleOptions {
   provider: LlmProvider | null;
   /** What the assistant is told about the business until an admin edits it (Helm value). */
   assistantContext?: string;
+  /** Multi-store provisioning; absent or kube null when switched off. */
+  stores?: StoresOptions;
+  /** Token of the internal API (/internal) for platform components. */
+  internalToken?: string;
   allowedHosts: string[];
   version: string;
   /** Loopback URL of this process's /mcp endpoint, for the chat agent. */
@@ -58,11 +66,18 @@ export function createGatewayModules(
   const manager = new UpstreamManager(ctx, options.factory, options.connection);
   const catalog = new ToolCatalog(manager);
   const policies = new ToolPolicies(ctx);
+  const metrics = new GatewayMetrics(manager);
   // Checks every resolved call runs through before it goes upstream, in order.
-  const invoker = new ToolInvoker({ ctx, catalog, manager }, [new PolicyGuard(policies)]);
+  const invoker = new ToolInvoker({ ctx, catalog, manager, observer: metrics }, [
+    new PolicyGuard(policies),
+  ]);
   const chatTokens = new ChatTokenStore(ctx.now);
   const approvals = new ApprovalTokens(ctx.settings.apiKeyPepper, ctx.now);
   const assistant = new AssistantSettingsStore(ctx, options.assistantContext ?? '');
+  const stores = new StoreService(
+    ctx,
+    options.stores ?? { kube: null, namespace: 'ahjin', maxPerUser: 0 },
+  );
   let endpoint: { close(): Promise<void> } | undefined;
 
   return {
@@ -70,16 +85,21 @@ export function createGatewayModules(
     catalog,
     chatTokens,
     async register(app) {
+      metrics.register(app);
       await registerAuthPlugin(app, ctx);
       registerAuthRoutes(app, ctx);
       registerKeyRoutes(app, ctx);
-      registerServerRoutes(app, {
+      const serversDeps = {
         ctx,
         manager,
         factory: options.factory,
         urlGuard: options.urlGuard,
-      });
+      };
+      registerServerRoutes(app, serversDeps);
+      registerInternalRoutes(app, serversDeps, options.internalToken);
+      registerStoreRoutes(app, stores);
       registerAuditRoutes(app, ctx);
+      registerInsightsRoutes(app, { ctx, manager });
       registerPolicyRoutes(app, {
         ctx,
         policies,
@@ -95,6 +115,7 @@ export function createGatewayModules(
         assistant,
         provider: options.provider,
         mcpUrl: options.mcpUrl,
+        onTurn: (result) => metrics.recordChatTurn(result),
       });
       endpoint = registerMcpEndpoint(app, {
         ctx,
@@ -103,6 +124,7 @@ export function createGatewayModules(
         invoker,
         policies,
         chatTokens,
+        onAuthDenied: (reason) => metrics.recordAuthDenied(reason),
         allowedHosts: options.allowedHosts,
         version: options.version,
       });

@@ -1,3 +1,4 @@
+import { inClusterConfig, KubeClient } from '@ahjin/kube';
 import { createLogger } from '@ahjin/logger';
 import { buildApp } from './app';
 import { createGatewayModules, shutdown } from './compose';
@@ -62,6 +63,12 @@ async function main() {
     urlGuard,
     provider,
     assistantContext: config.CHAT_CONTEXT,
+    stores: {
+      kube: config.STORES_ENABLED ? new KubeClient(inClusterConfig()) : null,
+      namespace: config.POD_NAMESPACE,
+      maxPerUser: config.STORES_MAX_PER_USER,
+    },
+    internalToken: config.INTERNAL_TOKEN,
     allowedHosts: mcpAllowedHosts(config),
     version: config.APP_VERSION,
     mcpUrl: () => `http://127.0.0.1:${config.PORT}/mcp`,

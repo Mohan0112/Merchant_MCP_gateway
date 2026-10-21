@@ -105,6 +105,10 @@ const SECRETS = [
       password: env.ADMIN_PASSWORD || password(),
     }),
   },
+  // The gateway's internal API token, shared with the store operator (Task 30).
+  { name: 'gateway-internal', generate: () => ({ token: token(32) }) },
+  // Grafana's admin login (observability sub-chart); `task logins` prints it.
+  { name: 'grafana-admin', generate: () => ({ user: 'admin', password: password() }) },
   {
     name: 'llm',
     sync: () => ({

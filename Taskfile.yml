@@ -23,6 +23,9 @@ vars:
     --set fx-mcp.image.tag={{.IMAGE_TAG}}
     --set platform.gateway.image.tag={{.IMAGE_TAG}}
     --set platform.dashboard.image.tag={{.IMAGE_TAG}}
+    --set stores.operator.image.tag={{.IMAGE_TAG}}
+    --set stores.images.wordpress.tag={{.IMAGE_TAG}}
+    --set stores.images.wooMcp.tag={{.IMAGE_TAG}}
 
 tasks:
   install:
@@ -80,6 +83,7 @@ tasks:
       - task: image:node
         vars: { APP: gateway }
       - task: image:dashboard
+      - task: image:store-operator
 
   image:node:
     desc: Build and push one Node service image (task image:node APP=fx-mcp)
@@ -94,6 +98,12 @@ tasks:
     cmds:
       - docker build -f docker/dashboard/Dockerfile -t {{.REGISTRY}}/ahjin-dashboard:{{.TAG}} .
       - docker push {{.REGISTRY}}/ahjin-dashboard:{{.TAG}}
+
+  image:store-operator:
+    desc: Build and push the store operator image (Node bundle, Helm and the store-instance chart)
+    cmds:
+      - docker build -f docker/store-operator/Dockerfile -t {{.REGISTRY}}/ahjin-store-operator:{{.TAG}} .
+      - docker push {{.REGISTRY}}/ahjin-store-operator:{{.TAG}}
 
   image:wordpress:
     desc: Build and push the WordPress + WooCommerce store image
@@ -120,6 +130,12 @@ tasks:
           echo "dashboard  http://app.127.0.0.1.nip.io            email:
           $(kubectl -n {{.NAMESPACE}} get secret gateway-bootstrap-admin -o jsonpath='{.data.email}' | base64 -d)
           password: $(kubectl -n {{.NAMESPACE}} get secret gateway-bootstrap-admin -o jsonpath='{.data.password}' | base64 -d)"
+        silent: true
+      - cmd: >-
+          if kubectl -n {{.NAMESPACE}} get secret grafana-admin >/dev/null 2>&1; then
+          echo "grafana    http://grafana.127.0.0.1.nip.io        user:
+          $(kubectl -n {{.NAMESPACE}} get secret grafana-admin -o jsonpath='{.data.user}' | base64 -d)
+          password: $(kubectl -n {{.NAMESPACE}} get secret grafana-admin -o jsonpath='{.data.password}' | base64 -d)"; fi
         silent: true
       # Demo members A and B exist once task demo:reset has run.
       - cmd: >-
@@ -182,6 +198,24 @@ tasks:
     prompt: This deletes the store database and all uploads. Continue?
     cmds:
       - kubectl -n {{.NAMESPACE}} delete pvc wp-uploads data-mariadb-0 --ignore-not-found
+
+  backup:now:
+    desc: Back up the store and platform databases now (the chart also does it nightly and before every upgrade)
+    cmds:
+      - node scripts/backup.mjs now --context={{.CONTEXT}} --namespace={{.NAMESPACE}}
+
+  backup:list:
+    desc: List the backups in the store and platform backup volumes
+    cmds:
+      - node scripts/backup.mjs list --context={{.CONTEXT}} --namespace={{.NAMESPACE}}
+
+  backup:restore:
+    desc: Restore a database from a backup (task backup:restore COMPONENT=store|platform [NAME=<file>|latest]). Destructive.
+    prompt: This replaces the current database with the backup. Continue?
+    requires:
+      vars: [COMPONENT]
+    cmds:
+      - node scripts/backup.mjs restore --component={{.COMPONENT}} --name={{.NAME | default "latest"}} --context={{.CONTEXT}} --namespace={{.NAMESPACE}}
 
   demo:reset:
     desc: Clean demo state - no orders, sample products only, all servers on, fresh users A and B, empty audit log
